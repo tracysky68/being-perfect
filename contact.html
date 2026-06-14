@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>聯絡我們 | 玩美學 Being Perfect</title>
+    <meta name="description" content="聯絡玩美學，洽詢課程、共學講堂、教育夥伴合作與講座活動邀約。">
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body data-page="contact">
+    <header class="site-header">
+      <a class="brand-mark" href="index.html" aria-label="玩美學首頁"><img class="brand-logo-icon" src="assets/logo-icon.jpg" alt="玩美學 BP Logo"><span class="brand-wordmark"><strong>玩美學</strong><small>BEING PERFECT</small><em>教育培訓基地</em></span></a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle><span></span><span></span><span></span></button>
+      <nav class="site-nav" id="site-nav" data-nav><a href="about.html" data-page-link="about">關於我們</a><a href="courses.html" data-page-link="courses">課程介紹</a><a href="talks.html" data-page-link="talks">共學講堂</a><a href="workshops.html" data-page-link="workshops">家長工作坊</a><a href="partners.html" data-page-link="partners">教育夥伴</a><a href="blog.html" data-page-link="blog">部落格</a><a href="contact.html" data-page-link="contact">聯絡我們</a>
+      </nav>
+    </header>
+    <main>
+      <section class="section contact">
+        <div>
+          <p class="eyebrow">Contact</p>
+          <h1>聯絡玩美學</h1>
+          <p>無論你是想了解課程與講堂、邀約合作、申請成為教育夥伴，或想進一步討論教育內容規劃，都歡迎與我們聯繫。</p>
+          <div class="contact-list">
+            <a href="mailto:playsomemoremore@gmail.com">playsomemoremore@gmail.com</a>
+            <span>LINE：@550ovurs</span>
+            <a href="https://www.facebook.com/profile.php?id=100057521497201">Facebook 專頁</a>
+          </div>
+        </div>
+        <form class="contact-form" data-contact-form>
+          <label>姓名<input type="text" name="name" autocomplete="name" required></label>
+          <label>聯絡信箱<input type="email" name="email" autocomplete="email" required></label>
+          <label>需求類型
+            <select name="topic" required>
+              <option value="">請選擇</option>
+              <option>課程 / 講堂詢問</option>
+              <option>家長工作坊</option>
+              <option>教育夥伴合作</option>
+              <option>講座 / 活動邀約</option>
+              <option>師資培訓</option>
+              <option>其他詢問</option>
+            </select>
+          </label>
+          <label>想說的事<textarea name="message" rows="5" required></textarea></label>
+          <button class="button primary" type="submit">送出需求</button>
+          <p class="form-note" data-form-note aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+    <footer class="site-footer"><p>玩美學 Being perfect</p><p>教育共生平台 / 師資賦能 / 課程整合</p></footer>
+    <script src="script.js"></script>
+  </body>
+</html>
