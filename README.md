@@ -16,6 +16,7 @@
 - `contact.html`：聯絡我們
 - `register.html`：教師專班報名與付款入口
 - `payment-result.html`：PAYUNi 返回頁
+- `teacher-intake.html`：付款後的日期選填與教師課前背景調查
 - `supabase/`：資料庫 migration、付款建立與付款通知函式
 
 ## 金流開發設定
@@ -31,7 +32,9 @@
 
 課程以「月份梯次」販售；每個月份梯次在 `course_sessions` 建立 day 1、day 2 的平日與假日場。學員付款後透過 `enrollment_sessions` 各選一個 day 1 與 day 2，因此可以平日／假日混搭。一般選課限同月份，跨月補課由行政後台指派。
 
-2026 首梯價格：一般學員 NT$13,800（NT$4,600 × 3）；家長班舊生 NT$10,800（NT$3,600 × 3）。三期皆為等額、零手續費，透過 `payment_installments` 追蹤且只建立一筆報名。
+2026 首梯公開價格為 NT$13,800（NT$4,600 × 3）。三期皆為等額、零手續費，透過 `payment_installments` 追蹤且只建立一筆報名。
+
+付款確認後，學員以 `enrollment_portal_tokens` 中的不可猜測專屬連結進入課前頁面。只有 `paid` 或 `partially_paid` 報名可選擇日期並提交背景調查；選課容量由資料庫函式在同一交易中鎖定與檢查。
 
 正式上線前必須以 PAYUNi 商店後台最新版 API 文件核對成功狀態欄位，並完成成功、失敗、重複通知、金額不符四項測試。
 

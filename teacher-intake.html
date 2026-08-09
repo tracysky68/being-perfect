@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>課前日期與背景調查 | 玩美學</title>
+    <meta name="robots" content="noindex,nofollow">
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body data-page="teacher-intake">
+    <header class="site-header">
+      <a class="brand-mark" href="index.html" aria-label="玩美學首頁"><img class="brand-logo-icon" src="assets/logo-icon.jpg" alt="玩美學 BP Logo"><span class="brand-wordmark"><strong>玩美學</strong><small>BEING PERFECT</small><em>教育培訓基地</em></span></a>
+      <span class="portal-badge">學員專屬頁面</span>
+    </header>
+    <main class="intake-page">
+      <section class="intake-hero">
+        <div>
+          <p class="eyebrow">Before We Meet · Teacher Intake</p>
+          <h1>讓我們先讀懂<br><em>你的教學現場</em></h1>
+          <p>選好兩天的上課日期，再留下你真正想處理的問題。這些資料會交給講師作為備課依據。</p>
+        </div>
+        <aside class="intake-identity" data-intake-identity hidden>
+          <span>報名資料</span><strong data-student-name></strong><small data-cohort-title></small>
+        </aside>
+      </section>
+
+      <section class="intake-shell">
+        <div class="portal-state" data-portal-loading><span class="loading-mark">BP</span><p>正在確認你的專屬連結…</p></div>
+        <div class="portal-state error" data-portal-error hidden><strong>目前無法開啟表單</strong><p data-error-message></p><a class="button ghost" href="index.html">返回首頁</a></div>
+
+        <form id="teacher-intake-form" class="teacher-intake-form" hidden>
+          <section class="intake-section">
+            <div class="section-number">01</div>
+            <div class="section-copy"><p class="eyebrow mint">Choose Your Dates</p><h2>選擇兩天的上課日期</h2><p>兩天可以自由搭配平日與假日。已額滿的場次將無法選擇。</p></div>
+            <fieldset class="session-group"><legend>第一天 Day 1</legend><div class="session-options" data-day-1></div></fieldset>
+            <fieldset class="session-group"><legend>第二天 Day 2</legend><div class="session-options" data-day-2></div></fieldset>
+          </section>
+
+          <section class="intake-section">
+            <div class="section-number">02</div>
+            <div class="section-copy"><p class="eyebrow coral">Your Teaching Context</p><h2>你的教學背景</h2><p>沒有標準答案，請依照目前最接近的情況填寫。</p></div>
+            <div class="field-pair">
+              <label>目前主要身分<select name="currentRole" required><option value="">請選擇</option><option>幼兒園教師</option><option>國小教師</option><option>安親／課後教師</option><option>美術教師</option><option>才藝教師</option><option>教育工作者</option><option>其他</option></select></label>
+              <label>任教單位（選填）<input name="organization" maxlength="120" placeholder="例如：○○幼兒園"></label>
+            </div>
+            <label>教學年資<select name="teachingYears" required><option value="">請選擇</option><option>未滿 1 年</option><option>1–3 年</option><option>4–7 年</option><option>8–12 年</option><option>13 年以上</option></select></label>
+            <fieldset class="answer-group"><legend>目前主要接觸的孩子年齡（可複選）</legend><div class="chip-options"><label><input type="checkbox" name="studentAgeGroups" value="2–3 歲"><span>2–3 歲</span></label><label><input type="checkbox" name="studentAgeGroups" value="4–6 歲"><span>4–6 歲</span></label><label><input type="checkbox" name="studentAgeGroups" value="國小低年級"><span>國小低年級</span></label><label><input type="checkbox" name="studentAgeGroups" value="國小中高年級"><span>國小中高年級</span></label><label><input type="checkbox" name="studentAgeGroups" value="國中以上"><span>國中以上</span></label></div></fieldset>
+            <div class="field-pair">
+              <label>美術相關背景<select name="artBackground" required><option value="">請選擇</option><option>沒有</option><option>曾接觸／自學</option><option>受過相關培訓</option><option>相關科系／專業背景</option></select></label>
+              <label>兒童教育相關背景<select name="educationBackground" required><option value="">請選擇</option><option>沒有</option><option>曾接觸／自學</option><option>受過相關培訓</option><option>相關科系／專業背景</option></select></label>
+            </div>
+          </section>
+
+          <section class="intake-section">
+            <div class="section-number">03</div>
+            <div class="section-copy"><p class="eyebrow">What Really Happens</p><h2>帶著真實問題來</h2><p>越具體，講師越能把課程內容靠近你的現場。</p></div>
+            <fieldset class="answer-group"><legend>目前最常遇到的教學困難（可複選）</legend><div class="chip-options wide"><label><input type="checkbox" name="mainChallenges" value="不知道如何回應孩子的作品"><span>不知道如何回應孩子的作品</span></label><label><input type="checkbox" name="mainChallenges" value="孩子容易說不會或不敢畫"><span>孩子容易說不會或不敢畫</span></label><label><input type="checkbox" name="mainChallenges" value="孩子只想模仿或要求範本"><span>孩子只想模仿或要求範本</span></label><label><input type="checkbox" name="mainChallenges" value="課堂秩序與情緒難以兼顧"><span>課堂秩序與情緒難以兼顧</span></label><label><input type="checkbox" name="mainChallenges" value="難以和家長說明孩子的學習"><span>難以和家長說明孩子的學習</span></label><label><input type="checkbox" name="mainChallenges" value="其他"><span>其他</span></label></div></fieldset>
+            <label>這次最想理解或解決的問題<textarea name="focusQuestions" rows="5" maxlength="2000" required placeholder="可以描述一個最近讓你卡住的教學情境…"></textarea></label>
+            <label>希望從這次專班帶走什麼？<textarea name="learningExpectations" rows="4" maxlength="2000" required placeholder="例如：更知道怎麼觀察作品、怎麼和孩子對話…"></textarea></label>
+            <label>想帶進課堂討論的案例（選填）<textarea name="caseDescription" rows="4" maxlength="3000" placeholder="請勿填寫孩子的真實姓名或可辨識個資。"></textarea></label>
+            <label class="consent soft"><input type="checkbox" name="artworkPermission"><span>若後續提供匿名化作品或案例，我願意讓講師在本次專班中作為教學討論使用。</span></label>
+            <label>其他希望講師事前知道的事情（選填）<textarea name="additionalNotes" rows="3" maxlength="2000"></textarea></label>
+          </section>
+
+          <div class="intake-submit-bar">
+            <div><strong>送出後仍可使用原連結修改</strong><small>系統會以最後一次提交內容為準</small></div>
+            <button class="button dark" type="submit"><span>儲存日期與課前資料</span><span aria-hidden="true">→</span></button>
+          </div>
+          <div class="checkout-status" data-submit-status role="status" aria-live="polite"></div>
+        </form>
+
+        <div class="portal-success" data-portal-success hidden><span>完成</span><h2>我們收到你的課前資料了</h2><p>講師會在課前閱讀你的背景與問題。若想修改，重新開啟原本的專屬連結即可。</p><a class="button primary" href="index.html">回到玩美學首頁</a></div>
+      </section>
+    </main>
+    <footer class="site-footer"><p>玩美學 Being Perfect</p><p>你的資料只用於本次課程安排與講師備課</p></footer>
+    <script src="config.js"></script><script src="teacher-intake.js"></script>
+  </body>
+</html>
+

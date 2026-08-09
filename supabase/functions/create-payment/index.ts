@@ -61,6 +61,9 @@ Deno.serve(async (request) => {
     }).select("id").single();
     if (enrollmentError) throw enrollmentError;
 
+    const { error: portalTokenError } = await supabase.from("enrollment_portal_tokens").insert({ enrollment_id: enrollment.id });
+    if (portalTokenError) throw portalTokenError;
+
     const installmentRows = paymentOption === "installments"
       ? Array.from({ length: plan.installment_count }, (_, index) => ({ enrollment_id: enrollment.id, installment_number: index + 1, amount_twd: plan.installment_amount_twd }))
       : [{ enrollment_id: enrollment.id, installment_number: 1, amount_twd: plan.total_amount_twd }];
