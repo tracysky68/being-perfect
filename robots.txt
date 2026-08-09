@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://tracysky68.github.io/being-perfect/sitemap.xml
+Sitemap: https://beingperfect.com.tw/sitemap.xml
