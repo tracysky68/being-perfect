@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <title>NT$1 串接測試 | 玩美學</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body data-page="register">
+    <header class="site-header"><a class="brand-mark" href="index.html"><img class="brand-logo-icon" src="assets/logo-icon.jpg" alt="玩美學"><span class="brand-wordmark"><strong>玩美學</strong><small>BEING PERFECT</small><em>教育培訓基地</em></span></a></header>
+    <main class="enrollment-page">
+      <section class="enrollment-intro">
+        <p class="eyebrow">Private System Test</p>
+        <h1>NT$1 金流與寄信測試</h1>
+        <p class="lead">這是暫時性的內部測試頁，不會出現在正式網站導覽。完成後會驗證付款通知、確認信與課前資料連結。</p>
+        <div class="course-ticket"><span>測試訂單</span><strong>只收取 NT$1</strong></div>
+      </section>
+      <section class="enrollment-panel">
+        <div class="panel-heading"><span>01</span><div><p class="eyebrow mint">Test Payment</p><h2>填寫收信資料</h2><p>請使用你現在可以收信的 Email。</p></div></div>
+        <form id="enrollment-form" class="enrollment-form" novalidate>
+          <input type="hidden" name="courseCode" value="TEACHER-DIALOGUE">
+          <input type="hidden" name="pricingCode" value="SYSTEM-TEST-1">
+          <input type="hidden" name="paymentOption" value="full">
+          <label>姓名／稱呼<input name="name" autocomplete="name" maxlength="80" required></label>
+          <div class="field-pair">
+            <label>Email<input type="email" name="email" autocomplete="email" maxlength="254" required></label>
+            <label>手機號碼<input type="tel" name="phone" autocomplete="tel" inputmode="tel" maxlength="20" required placeholder="09xxxxxxxx"></label>
+          </div>
+          <label>測試梯次<select name="cohortId" required><option value="">正在載入…</option></select></label>
+          <aside class="schedule-after-payment"><span>本次金額：NT$1</span><p>僅供完整串接測試，請勿轉傳此頁。</p></aside>
+          <label class="consent"><input type="checkbox" name="privacyConsent" required><span>我同意以本次資料測試報名與寄信流程。</span></label>
+          <label class="consent"><input type="checkbox" name="termsConsent" required><span>我確認本次實際付款金額為 NT$1。</span></label>
+          <div id="form-status" class="checkout-status" role="status" aria-live="polite"></div>
+          <div class="checkout-total"><span>本次付款</span><strong>NT$1</strong></div>
+          <button class="button dark checkout-button" type="submit"><span>前往 PAYUNi 支付 NT$1</span><span aria-hidden="true">→</span></button>
+          <p class="security-note">付款由 PAYUNi 統一金流處理，本站不保存信用卡資料。</p>
+        </form>
+      </section>
+    </main>
+    <script src="config.js"></script><script src="payment-test.js"></script>
+  </body>
+</html>
+
