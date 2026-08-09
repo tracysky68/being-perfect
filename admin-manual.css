@@ -1,0 +1,16 @@
+.header-actions .primary-action { background: var(--coral); color: #fff; }
+.manual-dialog { width: min(760px, 94vw); }
+.manual-head { padding: 36px 42px 25px; background: var(--mint); border-bottom: var(--line); }
+.manual-head h2 { margin: 8px 0; font-size: 2.4rem; }
+.manual-head p { margin: 0; color: #4f5f58; }
+.manual-form { display: grid; gap: 18px; padding: 30px 42px 40px; }
+.manual-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.manual-form label { display: grid; gap: 7px; font-size: .78rem; font-weight: 900; }
+.manual-form input, .manual-form select, .manual-form textarea { width: 100%; padding: 12px; border: 1.5px solid var(--ink); background: #fff; }
+.send-choice { grid-template-columns: auto 1fr !important; align-items: center; padding: 13px; background: #fff8cf; border: 1.5px solid; }
+.send-choice input { width: 18px; height: 18px; }
+.send-choice span { display: grid; }
+.send-choice small { font-weight: 500; color: var(--muted); }
+.manual-submit { display: flex; justify-content: space-between; padding: 15px 18px; border: var(--line); background: var(--ink); color: #fff; font-weight: 900; cursor: pointer; }
+.manual-submit:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 820px) { .manual-grid { grid-template-columns: 1fr; } .header-actions { flex-wrap: wrap; justify-content: flex-end; } .header-actions .primary-action { order: 3; } }

@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="admin.css">
+    <link rel="stylesheet" href="admin-manual.css">
   </head>
   <body>
     <main id="login-view" class="login-shell">
@@ -33,7 +34,7 @@
     <div id="dashboard-view" class="dashboard" hidden>
       <header class="admin-header">
         <a href="index.html" class="admin-brand"><img src="assets/logo-icon.jpg" alt=""><span><b>玩美學</b><small>學員管理編輯台</small></span></a>
-        <div class="header-actions"><span id="last-updated"></span><button id="refresh-button">重新整理</button><button id="logout-button" class="quiet">登出</button></div>
+        <div class="header-actions"><span id="last-updated"></span><button id="manual-add-button" class="primary-action">＋ 人工新增已付款學員</button><button id="refresh-button">重新整理</button><button id="logout-button" class="quiet">登出</button></div>
       </header>
       <section class="dashboard-intro">
         <div><p class="kicker">Teacher Program / Operations</p><h1>教師專班<br><em>學員總覽</em></h1></div>
@@ -67,7 +68,25 @@
       <button class="dialog-close" aria-label="關閉">×</button>
       <div id="student-detail"></div>
     </dialog>
+    <dialog id="manual-dialog" class="manual-dialog">
+      <button class="dialog-close manual-close" aria-label="關閉">×</button>
+      <div class="manual-head"><span class="section-no">MANUAL ENROLLMENT</span><h2>人工新增已付款學員</h2><p>適用於轉帳、既有付款連結或其他已確認收款的學員。</p></div>
+      <form id="manual-form" class="manual-form">
+        <div class="manual-grid">
+          <label>姓名／稱呼<input name="name" required maxlength="80"></label>
+          <label>Email<input name="email" type="email" required maxlength="254"></label>
+          <label>手機號碼<input name="phone" type="tel" required inputmode="tel" placeholder="09xxxxxxxx"></label>
+          <label>報名梯次<select name="cohortId" id="manual-cohort" required><option value="">請選擇梯次</option></select></label>
+          <label>實際付款金額<input name="amountTwd" type="number" min="1" step="1" value="13800" required></label>
+          <label>付款日期<input name="paidDate" type="date" required></label>
+        </div>
+        <label>付款方式<select name="manualMethod" required><option value="bank_transfer">銀行轉帳</option><option value="payuni_link">人工 PAYUNi 連結</option><option value="cash">現金</option><option value="other">其他</option></select></label>
+        <label>行政備註<textarea name="adminNotes" rows="3" placeholder="例如：已於對帳單確認、家長班舊生優惠"></textarea></label>
+        <label class="send-choice"><input name="sendEmail" type="checkbox" checked><span><b>建立後立即寄出課前表單</b><small>系統會寄送專屬連結給學員</small></span></label>
+        <p id="manual-status" class="form-status" role="status"></p>
+        <button id="manual-submit" class="manual-submit" type="submit">建立已付款學員並寄信 <span>→</span></button>
+      </form>
+    </dialog>
     <script src="config.js"></script><script type="module" src="admin.js"></script>
   </body>
 </html>
-

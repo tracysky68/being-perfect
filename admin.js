@@ -9,7 +9,10 @@ const loginStatus = document.querySelector("#login-status");
 const table = document.querySelector("#students-table");
 const tbody = document.querySelector("#students-body");
 const dialog = document.querySelector("#student-dialog");
+const manualDialog = document.querySelector("#manual-dialog");
+const manualForm = document.querySelector("#manual-form");
 let records = [];
+let cohorts = [];
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':"&quot;"}[char]));
 const money = (value) => `NT$${Number(value || 0).toLocaleString("zh-TW")}`;
@@ -31,7 +34,7 @@ async function loadData() {
   if (response.status === 401 || response.status === 403) { await supabase.auth.signOut(); showLogin("這個帳號沒有管理權限。"); return; }
   const result = await response.json();
   if (!response.ok) throw new Error(result.message || "後台資料載入失敗");
-  records = result.records;
+  records = result.records; cohorts = result.cohorts || [];
   updateMetrics(); populateCohorts(); renderRows();
   document.querySelector("#last-updated").textContent = `更新：${dateTime(new Date())}`;
 }
@@ -48,6 +51,7 @@ function populateCohorts() {
   const current = select.value;
   select.innerHTML = '<option value="">全部梯次</option>'+[...new Set(records.map(r=>r.cohort))].sort().map(v=>`<option>${escapeHtml(v)}</option>`).join("");
   select.value = current;
+  document.querySelector("#manual-cohort").innerHTML = '<option value="">請選擇梯次</option>'+cohorts.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.title)}</option>`).join("");
 }
 
 function filteredRecords() {
@@ -84,10 +88,38 @@ function exportCsv() {
   const link = document.createElement("a"); link.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"})); link.download=`玩美學學員名單-${new Date().toISOString().slice(0,10)}.csv`; link.click(); URL.revokeObjectURL(link.href);
 }
 
+function openManualForm() {
+  manualForm.reset();
+  manualForm.elements.amountTwd.value = "13800";
+  manualForm.elements.paidDate.value = new Date().toLocaleDateString("en-CA", {timeZone:"Asia/Taipei"});
+  document.querySelector("#manual-status").textContent = "";
+  document.querySelector("#manual-submit").disabled = false;
+  manualDialog.showModal();
+}
+
+manualForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!manualForm.reportValidity()) return;
+  const submit = document.querySelector("#manual-submit");
+  const status = document.querySelector("#manual-status");
+  submit.disabled = true; status.textContent = "正在建立學員與專屬課前連結…";
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const payload = Object.fromEntries(new FormData(manualForm).entries());
+    payload.action = "create_manual_paid";
+    const response = await fetch(config.adminEndpoint, { method:"POST", headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`}, body:JSON.stringify(payload) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || "建立失敗");
+    status.textContent = result.emailSent ? "建立完成，課前表單信件已寄出。" : result.emailRequested ? "學員已建立，但信件寄送失敗；可稍後補寄。" : "學員已建立，尚未寄信。";
+    await loadData();
+    setTimeout(()=>manualDialog.close(), 1600);
+  } catch (error) { status.textContent = error.message; submit.disabled = false; }
+});
+
 function showLogin(message="") { loginView.hidden=false; dashboardView.hidden=true; loginStatus.textContent=message; }
 function showDashboard() { loginView.hidden=true; dashboardView.hidden=false; loadData().catch(error=>{document.querySelector("#loading-state").innerHTML=`<p>${escapeHtml(error.message)}</p>`;}); }
 loginForm.addEventListener("submit",async(e)=>{e.preventDefault();const email=document.querySelector("#admin-email").value.trim();loginStatus.textContent="正在寄送登入連結…";const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:"https://beingperfect.com.tw/admin.html"}});loginStatus.textContent=error?`寄送失敗：${error.message}`:"登入連結已寄出，請到信箱點擊後回到這裡。";});
 document.querySelector("#logout-button").addEventListener("click",async()=>{await supabase.auth.signOut();showLogin("已安全登出。");});
+document.querySelector("#manual-add-button").addEventListener("click",openManualForm);document.querySelector(".manual-close").addEventListener("click",()=>manualDialog.close());
 document.querySelector("#refresh-button").addEventListener("click",loadData);document.querySelector("#export-button").addEventListener("click",exportCsv);document.querySelectorAll("#search-input,#cohort-filter,#status-filter").forEach(el=>el.addEventListener(el.tagName==="INPUT"?"input":"change",renderRows));document.querySelector(".dialog-close").addEventListener("click",()=>dialog.close());dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close();});
 const {data:{session}}=await supabase.auth.getSession();session?showDashboard():showLogin();supabase.auth.onAuthStateChange((_event,next)=>{if(next&&dashboardView.hidden)showDashboard();});
-
