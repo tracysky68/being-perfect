@@ -1,13 +1,10 @@
 const enrollmentForm = document.querySelector("#enrollment-form");
 const formStatus = document.querySelector("#form-status");
-const companyFields = document.querySelector("[data-company-fields]");
 const cohortSelect = enrollmentForm?.elements.cohortId;
-const pricingOptions = document.querySelector("[data-pricing-options]");
 const paymentOptions = document.querySelector("[data-payment-options]");
 
 const fallbackPlans = {
-  "GENERAL-2026": { totalAmountTwd: 13800, installmentCount: 3, installmentAmountTwd: 4600 },
-  "PARENT-ALUMNI-2026": { totalAmountTwd: 10800, installmentCount: 3, installmentAmountTwd: 3600 }
+  "GENERAL-2026": { totalAmountTwd: 13800, installmentCount: 3, installmentAmountTwd: 4600 }
 };
 let pricingPlans = fallbackPlans;
 
@@ -23,7 +20,7 @@ function updateCheckoutSummary() {
   document.querySelector("[data-full-amount]").textContent = `本次付款 ${money(plan.totalAmountTwd)}`;
   document.querySelector("[data-installment-amount]").textContent = `每期 ${money(plan.installmentAmountTwd)}，共 ${plan.installmentCount} 期`;
   document.querySelector("[data-checkout-total]").textContent = money(paymentOption === "installments" ? plan.installmentAmountTwd : plan.totalAmountTwd);
-  document.querySelectorAll(".price-choice, .payment-choice").forEach((item) => item.classList.toggle("is-selected", item.querySelector("input").checked));
+  document.querySelectorAll(".payment-choice").forEach((item) => item.classList.toggle("is-selected", item.querySelector("input").checked));
 }
 
 async function loadCohorts() {
@@ -33,37 +30,33 @@ async function loadCohorts() {
     const response = await fetch(`${endpoint}?courseCode=${encodeURIComponent(enrollmentForm.elements.courseCode.value)}`);
     const result = await response.json();
     if (!response.ok) throw new Error(result.message);
-    cohortSelect.innerHTML = '<option value="">請選擇梯次</option>';
-    result.cohorts.forEach((cohort) => {
+    cohortSelect.innerHTML = '<option value="">請選擇月份</option>';
+    const availableCohorts = result.cohorts.filter((cohort) => {
+      const monthMatch = cohort.title.match(/(\d{1,2})\s*月/);
+      return monthMatch && [9, 10, 11].includes(Number(monthMatch[1]));
+    });
+    availableCohorts.forEach((cohort) => {
       const option = document.createElement("option");
       option.value = cohort.id;
-      const date = cohort.startsAt ? new Intl.DateTimeFormat("zh-TW", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Taipei" }).format(new Date(cohort.startsAt)) : "日期另行通知";
-      option.textContent = `${cohort.title}｜${date}`;
+      const monthMatch = cohort.title.match(/(\d{1,2})\s*月/);
+      const monthLabel = monthMatch ? `${Number(monthMatch[1])} 月` : cohort.title;
+      option.textContent = `${monthLabel}｜平日、假日`;
       cohortSelect.append(option);
     });
     if (result.pricingPlans?.length) {
-      pricingPlans = Object.fromEntries(result.pricingPlans.map((plan) => [plan.code, plan]));
+      const generalPlan = result.pricingPlans.find((plan) => plan.code === "GENERAL-2026");
+      if (generalPlan) pricingPlans = { "GENERAL-2026": generalPlan };
       updateCheckoutSummary();
     }
-    if (!result.cohorts.length) cohortSelect.innerHTML = '<option value="">目前尚無開放報名梯次</option>';
+    if (!availableCohorts.length) cohortSelect.innerHTML = '<option value="">目前尚無開放報名月份</option>';
   } catch (error) {
     cohortSelect.innerHTML = '<option value="">梯次載入失敗，請稍後再試</option>';
   }
 }
 
 loadCohorts();
-pricingOptions?.addEventListener("change", updateCheckoutSummary);
 paymentOptions?.addEventListener("change", updateCheckoutSummary);
 updateCheckoutSummary();
-
-enrollmentForm?.elements.invoiceType.forEach?.((radio) => {
-  radio.addEventListener("change", () => {
-    const isCompany = enrollmentForm.elements.invoiceType.value === "company";
-    companyFields.hidden = !isCompany;
-    enrollmentForm.elements.taxId.required = isCompany;
-    enrollmentForm.elements.invoiceTitle.required = isCompany;
-  });
-});
 
 function submitToPayuni(url, fields) {
   const paymentForm = document.createElement("form");

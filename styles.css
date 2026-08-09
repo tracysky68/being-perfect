@@ -459,7 +459,7 @@ textarea { resize: vertical; }
 }
 .enrollment-intro, .enrollment-panel { padding: clamp(44px, 6vw, 92px); }
 .enrollment-intro { align-self: start; position: sticky; top: 92px; }
-.enrollment-intro h1 { max-width: 680px; font-size: clamp(2.35rem, 3.8vw, 4.6rem); line-height: 1.04; }
+.enrollment-intro h1 { max-width: 620px; font-size: clamp(2.05rem, 3vw, 3.7rem); line-height: 1.08; }
 .lead { max-width: 650px; font-size: 1.12rem; font-weight: 700; }
 .course-ticket { position: relative; margin-top: 38px; padding: 28px; overflow: hidden; background: var(--ink); color: white; border-radius: var(--radius); box-shadow: 9px 9px 0 var(--coral); }
 .course-ticket::after { content: "BP"; position: absolute; right: -12px; bottom: -30px; color: rgba(255,255,255,.08); font-size: 8rem; font-weight: 900; }
@@ -486,6 +486,11 @@ textarea { resize: vertical; }
 .choice-row label, .consent { display: flex; grid-template-columns: none; align-items: flex-start; gap: 10px; }
 .choice-row input, .consent input { width: 20px; min-height: 20px; margin: 2px 0 0; accent-color: var(--ink); }
 .price-choice-grid, .payment-choice-grid { display: grid; gap: 12px; }
+.fixed-price-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px; border: 2px solid var(--ink); border-radius: 14px; background: #fff; box-shadow: 5px 5px 0 var(--sun); }
+.fixed-price-card span { display: grid; gap: 3px; }
+.fixed-price-card b { font-size: 1rem; }
+.fixed-price-card small { color: #756b61; line-height: 1.55; }
+.fixed-price-card strong { white-space: nowrap; font-size: 1.15rem; }
 .price-choice, .payment-choice { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; padding: 18px; cursor: pointer; border: 2px solid #d8cfc3; border-radius: 14px; background: rgba(255,255,255,.7); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
 .payment-choice { grid-template-columns: auto 1fr; }
 .price-choice:hover, .payment-choice:hover { transform: translateY(-2px); border-color: var(--ink); }

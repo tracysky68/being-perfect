@@ -42,25 +42,17 @@
           </div>
           <label>選擇月份
             <select name="cohortId" required>
-              <option value="">請選擇上課月份</option>
+              <option value="">請選擇月份</option>
               <option value="demo-cohort" disabled>正式梯次將由後台資料載入</option>
             </select>
           </label>
           <fieldset class="pricing-fieldset">
-            <legend>選擇適用方案</legend>
-            <div class="price-choice-grid" data-pricing-options>
-              <label class="price-choice is-selected">
-                <input type="radio" name="pricingCode" value="GENERAL-2026" checked>
-                <span><b>一般學員</b><small>教師專班正式優惠價</small></span>
-                <strong>NT$13,800</strong>
-              </label>
-              <label class="price-choice">
-                <input type="radio" name="pricingCode" value="PARENT-ALUMNI-2026">
-                <span><b>家長班舊生</b><small>系統將依 Email 或手機核對舊生名單</small></span>
-                <strong>NT$10,800</strong>
-              </label>
+            <legend>課程費用</legend>
+            <input type="hidden" name="pricingCode" value="GENERAL-2026">
+            <div class="fixed-price-card">
+              <span><b>教師專班</b><small>正式課程費用</small></span>
+              <strong>NT$13,800</strong>
             </div>
-            <p class="field-help">舊生資格不需輸入折扣碼；請使用參加家長班時留下的 Email 或手機。</p>
           </fieldset>
           <fieldset class="payment-fieldset">
             <legend>付款方式</legend>
@@ -70,16 +62,9 @@
             </div>
           </fieldset>
           <aside class="schedule-after-payment">
-            <span>付款後再選時段</span>
-            <p>你可以自由搭配：Day 1 選平日、Day 2 選假日，或反過來。每一場次上限 16 位。</p>
+            <span>日期於報名後選填</span>
+            <p>報名後會有連結讓你做日期的選填。</p>
           </aside>
-          <fieldset>
-            <legend>發票資訊</legend>
-            <div class="choice-row"><label><input type="radio" name="invoiceType" value="personal" checked> 個人</label><label><input type="radio" name="invoiceType" value="company"> 公司／機構</label></div>
-            <div class="company-fields" data-company-fields hidden>
-              <div class="field-pair"><label>統一編號<input name="taxId" inputmode="numeric" maxlength="8"></label><label>發票抬頭<input name="invoiceTitle" maxlength="100"></label></div>
-            </div>
-          </fieldset>
           <label class="consent"><input type="checkbox" name="privacyConsent" required><span>我已閱讀並同意個人資料蒐集與課程服務所需之使用說明。</span></label>
           <label class="consent"><input type="checkbox" name="termsConsent" required><span>我已確認課程內容、付款方式與取消退款規則。</span></label>
           <div id="form-status" class="checkout-status" role="status" aria-live="polite"></div>
