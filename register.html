@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>教師專班報名 | 玩美學 Being Perfect</title>
+    <meta name="description" content="玩美學教師專班正式報名與付款頁。">
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body data-page="register">
+    <header class="site-header">
+      <a class="brand-mark" href="index.html" aria-label="玩美學首頁"><img class="brand-logo-icon" src="assets/logo-icon.jpg" alt="玩美學 BP Logo"><span class="brand-wordmark"><strong>玩美學</strong><small>BEING PERFECT</small><em>教育培訓基地</em></span></a>
+      <a class="button ghost header-action" href="courses.html">返回課程介紹</a>
+    </header>
+    <main class="enrollment-page">
+      <section class="enrollment-intro">
+        <p class="eyebrow">Teacher Program · Enrollment</p>
+        <h1>把教學現場的卡點，帶進一場真正能練習的專班</h1>
+        <p class="lead">完成報名與付款後，我們會寄送專屬課前調查，讓講師在上課前先理解你的教學背景與真實需求。</p>
+        <div class="course-ticket" aria-label="課程摘要">
+          <span>教師專班</span>
+          <strong>看懂孩子，說對話</strong>
+          <dl><div><dt>形式</dt><dd>線上互動專班</dd></div><div><dt>名額</dt><dd>小班制</dd></div><div><dt>課程費用</dt><dd>由正式梯次設定</dd></div></dl>
+        </div>
+        <ol class="checkout-steps" aria-label="報名流程">
+          <li class="active"><b>1</b><span>填寫報名資料</span></li>
+          <li><b>2</b><span>前往安全付款</span></li>
+          <li><b>3</b><span>完成課前調查</span></li>
+        </ol>
+      </section>
+
+      <section class="enrollment-panel">
+        <div class="panel-heading"><span>01</span><div><p class="eyebrow mint">Registration</p><h2>建立你的報名資料</h2><p>付款成功後，系統會以這組 Email 寄送確認信與課前資料。</p></div></div>
+        <form id="enrollment-form" class="enrollment-form" novalidate>
+          <input type="hidden" name="courseCode" value="TEACHER-DIALOGUE">
+          <label>姓名／稱呼<input name="name" autocomplete="name" maxlength="80" required placeholder="例如：曾薇玲"></label>
+          <div class="field-pair">
+            <label>Email<input type="email" name="email" autocomplete="email" maxlength="254" required placeholder="name@example.com"></label>
+            <label>手機號碼<input type="tel" name="phone" autocomplete="tel" inputmode="tel" maxlength="20" required placeholder="09xxxxxxxx"></label>
+          </div>
+          <label>選擇月份
+            <select name="cohortId" required>
+              <option value="">請選擇上課月份</option>
+              <option value="demo-cohort" disabled>正式梯次將由後台資料載入</option>
+            </select>
+          </label>
+          <fieldset class="pricing-fieldset">
+            <legend>選擇適用方案</legend>
+            <div class="price-choice-grid" data-pricing-options>
+              <label class="price-choice is-selected">
+                <input type="radio" name="pricingCode" value="GENERAL-2026" checked>
+                <span><b>一般學員</b><small>教師專班正式優惠價</small></span>
+                <strong>NT$13,800</strong>
+              </label>
+              <label class="price-choice">
+                <input type="radio" name="pricingCode" value="PARENT-ALUMNI-2026">
+                <span><b>家長班舊生</b><small>系統將依 Email 或手機核對舊生名單</small></span>
+                <strong>NT$10,800</strong>
+              </label>
+            </div>
+            <p class="field-help">舊生資格不需輸入折扣碼；請使用參加家長班時留下的 Email 或手機。</p>
+          </fieldset>
+          <fieldset class="payment-fieldset">
+            <legend>付款方式</legend>
+            <div class="payment-choice-grid" data-payment-options>
+              <label class="payment-choice is-selected"><input type="radio" name="paymentOption" value="full" checked><span><b>一次付清</b><small data-full-amount>本次付款 NT$13,800</small></span></label>
+              <label class="payment-choice"><input type="radio" name="paymentOption" value="installments"><span><b>三期零手續費</b><small data-installment-amount>每期 NT$4,600，共三期</small></span></label>
+            </div>
+          </fieldset>
+          <aside class="schedule-after-payment">
+            <span>付款後再選時段</span>
+            <p>你可以自由搭配：Day 1 選平日、Day 2 選假日，或反過來。每一場次上限 16 位。</p>
+          </aside>
+          <fieldset>
+            <legend>發票資訊</legend>
+            <div class="choice-row"><label><input type="radio" name="invoiceType" value="personal" checked> 個人</label><label><input type="radio" name="invoiceType" value="company"> 公司／機構</label></div>
+            <div class="company-fields" data-company-fields hidden>
+              <div class="field-pair"><label>統一編號<input name="taxId" inputmode="numeric" maxlength="8"></label><label>發票抬頭<input name="invoiceTitle" maxlength="100"></label></div>
+            </div>
+          </fieldset>
+          <label class="consent"><input type="checkbox" name="privacyConsent" required><span>我已閱讀並同意個人資料蒐集與課程服務所需之使用說明。</span></label>
+          <label class="consent"><input type="checkbox" name="termsConsent" required><span>我已確認課程內容、付款方式與取消退款規則。</span></label>
+          <div id="form-status" class="checkout-status" role="status" aria-live="polite"></div>
+          <div class="checkout-total"><span>本次付款</span><strong data-checkout-total>NT$13,800</strong></div>
+          <button class="button dark checkout-button" type="submit"><span>確認資料，前往 PAYUNi 付款</span><span aria-hidden="true">→</span></button>
+          <p class="security-note">付款由 PAYUNi 統一金流處理；本站不會保存信用卡卡號與安全碼。</p>
+        </form>
+      </section>
+    </main>
+    <footer class="site-footer"><p>玩美學 Being Perfect</p><p>安全報名・清楚紀錄・安心學習</p></footer>
+    <script src="config.js"></script><script src="script.js"></script><script src="register.js"></script>
+  </body>
+</html>

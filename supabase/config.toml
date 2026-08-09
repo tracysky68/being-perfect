@@ -1,0 +1,13 @@
+project_id = "being-perfect-course-system"
+
+[functions.create-payment]
+verify_jwt = false
+
+[functions.list-cohorts]
+verify_jwt = false
+
+[functions.payuni-notify]
+verify_jwt = false
+
+[functions.payuni-return]
+verify_jwt = false
