@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="admin.css">
     <link rel="stylesheet" href="admin-manual.css">
+    <link rel="stylesheet" href="admin-password.css">
   </head>
   <body>
     <main id="login-view" class="login-shell">
@@ -21,10 +22,11 @@
       <section class="login-card">
         <span class="section-no">00 / SIGN IN</span>
         <h2>管理者登入</h2>
-        <p>輸入管理 Email，我們會寄送一次性登入連結。不需要密碼。</p>
+        <p>輸入管理 Email 與密碼即可進入，不需要再等待登入信。</p>
         <form id="login-form">
-          <label>Email<input id="admin-email" type="email" autocomplete="email" required placeholder="name@example.com"></label>
-          <button type="submit">寄送安全登入連結 <span>→</span></button>
+          <label>Email<input id="admin-email" type="email" autocomplete="username" required value="tracysky68.bgt@gmail.com"></label>
+          <label>密碼<span class="password-field"><input id="admin-password" type="password" autocomplete="current-password" required placeholder="請輸入管理密碼"><button id="toggle-password" type="button" aria-label="顯示密碼">顯示</button></span></label>
+          <button type="submit">登入管理後台 <span>→</span></button>
         </form>
         <p id="login-status" class="form-status" role="status"></p>
         <small>此頁不開放一般學員使用。</small>
@@ -34,7 +36,7 @@
     <div id="dashboard-view" class="dashboard" hidden>
       <header class="admin-header">
         <a href="index.html" class="admin-brand"><img src="assets/logo-icon.jpg" alt=""><span><b>玩美學</b><small>學員管理編輯台</small></span></a>
-        <div class="header-actions"><span id="last-updated"></span><button id="manual-add-button" class="primary-action">＋ 人工新增已付款學員</button><button id="refresh-button">重新整理</button><button id="logout-button" class="quiet">登出</button></div>
+        <div class="header-actions"><span id="last-updated"></span><button id="manual-add-button" class="primary-action">＋ 人工新增已付款學員</button><button id="refresh-button">重新整理</button><button id="change-password-button">更換密碼</button><button id="logout-button" class="quiet">登出</button></div>
       </header>
       <section class="dashboard-intro">
         <div><p class="kicker">Teacher Program / Operations</p><h1>教師專班<br><em>學員總覽</em></h1></div>
@@ -85,6 +87,16 @@
         <label class="send-choice"><input name="sendEmail" type="checkbox" checked><span><b>建立後立即寄出課前表單</b><small>系統會寄送專屬連結給學員</small></span></label>
         <p id="manual-status" class="form-status" role="status"></p>
         <button id="manual-submit" class="manual-submit" type="submit">建立已付款學員並寄信 <span>→</span></button>
+      </form>
+    </dialog>
+    <dialog id="password-dialog" class="password-dialog">
+      <button class="dialog-close password-close" aria-label="關閉">×</button>
+      <div class="manual-head"><span class="section-no">SECURITY</span><h2>更換管理密碼</h2><p>請設定至少 8 個字元的新密碼，儲存後下次直接使用。</p></div>
+      <form id="password-form" class="manual-form">
+        <label>新密碼<input name="newPassword" type="password" minlength="8" autocomplete="new-password" required></label>
+        <label>再次輸入<input name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required></label>
+        <p id="password-status" class="form-status" role="status"></p>
+        <button class="manual-submit" type="submit">儲存新密碼 <span>→</span></button>
       </form>
     </dialog>
     <script src="config.js"></script><script type="module" src="admin.js"></script>

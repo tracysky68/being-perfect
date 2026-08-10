@@ -11,6 +11,8 @@ const tbody = document.querySelector("#students-body");
 const dialog = document.querySelector("#student-dialog");
 const manualDialog = document.querySelector("#manual-dialog");
 const manualForm = document.querySelector("#manual-form");
+const passwordDialog = document.querySelector("#password-dialog");
+const passwordForm = document.querySelector("#password-form");
 let records = [];
 let cohorts = [];
 
@@ -118,7 +120,11 @@ manualForm.addEventListener("submit", async (event) => {
 
 function showLogin(message="") { loginView.hidden=false; dashboardView.hidden=true; loginStatus.textContent=message; }
 function showDashboard() { loginView.hidden=true; dashboardView.hidden=false; loadData().catch(error=>{document.querySelector("#loading-state").innerHTML=`<p>${escapeHtml(error.message)}</p>`;}); }
-loginForm.addEventListener("submit",async(e)=>{e.preventDefault();const email=document.querySelector("#admin-email").value.trim();loginStatus.textContent="正在寄送登入連結…";const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:"https://beingperfect.com.tw/admin.html"}});loginStatus.textContent=error?`寄送失敗：${error.message}`:"登入連結已寄出，請到信箱點擊後回到這裡。";});
+loginForm.addEventListener("submit",async(e)=>{e.preventDefault();const email=document.querySelector("#admin-email").value.trim();const password=document.querySelector("#admin-password").value;const button=loginForm.querySelector('button[type="submit"]');button.disabled=true;loginStatus.textContent="正在登入…";const {error}=await supabase.auth.signInWithPassword({email,password});button.disabled=false;loginStatus.textContent=error?"登入失敗，請確認密碼是否正確。":"登入成功，正在開啟後台…";});
+document.querySelector("#toggle-password").addEventListener("click",()=>{const input=document.querySelector("#admin-password");const showing=input.type==="text";input.type=showing?"password":"text";document.querySelector("#toggle-password").textContent=showing?"顯示":"隱藏";});
+document.querySelector("#change-password-button").addEventListener("click",()=>{passwordForm.reset();document.querySelector("#password-status").textContent="";passwordDialog.showModal();});
+document.querySelector(".password-close").addEventListener("click",()=>passwordDialog.close());
+passwordForm.addEventListener("submit",async(e)=>{e.preventDefault();const data=new FormData(passwordForm);const password=String(data.get("newPassword"));const confirm=String(data.get("confirmPassword"));const status=document.querySelector("#password-status");if(password!==confirm){status.textContent="兩次輸入的密碼不一致。";return;}status.textContent="正在儲存…";const {error}=await supabase.auth.updateUser({password});if(error){status.textContent=`儲存失敗：${error.message}`;return;}status.textContent="密碼已更新完成。";setTimeout(()=>passwordDialog.close(),1000);});
 document.querySelector("#logout-button").addEventListener("click",async()=>{await supabase.auth.signOut();showLogin("已安全登出。");});
 document.querySelector("#manual-add-button").addEventListener("click",openManualForm);document.querySelector(".manual-close").addEventListener("click",()=>manualDialog.close());
 document.querySelector("#refresh-button").addEventListener("click",loadData);document.querySelector("#export-button").addEventListener("click",exportCsv);document.querySelectorAll("#search-input,#cohort-filter,#status-filter").forEach(el=>el.addEventListener(el.tagName==="INPUT"?"input":"change",renderRows));document.querySelector(".dialog-close").addEventListener("click",()=>dialog.close());dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close();});
