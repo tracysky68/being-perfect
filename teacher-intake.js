@@ -19,10 +19,10 @@ function formatSession(session) {
   return { date, time, type: session.scheduleType === "weekday" ? "平日" : "假日" };
 }
 
-function renderSessions(sessions, selections) {
+function renderSessions(sessions, selections, cohortId = null) {
   ["day_1", "day_2"].forEach((module) => {
     const container = document.querySelector(`[data-${module.replace("_", "-")}]`);
-    const options = sessions.filter((session) => session.module === module);
+    const options = sessions.filter((session) => session.module === module && (!cohortId || session.cohortId === cohortId));
     container.innerHTML = options.map((session) => {
       const display = formatSession(session);
       const full = session.remaining === 0 && selections[module] !== session.id;
@@ -52,9 +52,16 @@ async function loadPortal() {
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || "目前無法載入資料");
     document.querySelector("[data-student-name]").textContent = `${result.student.name}，你好`;
-    document.querySelector("[data-cohort-title]").textContent = result.cohort;
+    document.querySelector("[data-cohort-title]").textContent = result.cohortSelectionRequired ? "請在下方選擇月份" : result.cohort;
     document.querySelector("[data-intake-identity]").hidden = false;
-    renderSessions(result.sessions, result.selections);
+    if (result.cohortSelectionRequired) {
+      const picker = document.querySelector("[data-cohort-picker]");
+      const select = document.querySelector("[data-cohort-select]");
+      picker.hidden = false; select.required = true;
+      select.innerHTML = '<option value="">請選擇月份</option>'+result.cohorts.map((cohort)=>`<option value="${cohort.id}">${cohort.title.replace(/^2026 年 /, "")}</option>`).join("");
+      const refresh = () => renderSessions(result.sessions, result.selections, select.value);
+      select.addEventListener("change", refresh); refresh();
+    } else renderSessions(result.sessions, result.selections);
     fillExisting(result.intake);
     loadingState.hidden = true;
     form.hidden = false;
@@ -82,6 +89,7 @@ form?.addEventListener("submit", async (event) => {
   const data = new FormData(form);
   const payload = {
     token,
+    cohortId: data.get("cohortId") || null,
     day1SessionId: data.get("day1SessionId"),
     day2SessionId: data.get("day2SessionId"),
     intake: {
@@ -107,4 +115,3 @@ form?.addEventListener("submit", async (event) => {
 });
 
 loadPortal();
-

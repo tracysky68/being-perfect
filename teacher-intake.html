@@ -33,7 +33,8 @@
         <form id="teacher-intake-form" class="teacher-intake-form" hidden>
           <section class="intake-section">
             <div class="section-number">01</div>
-            <div class="section-copy"><p class="eyebrow mint">Choose Your Dates</p><h2>選擇兩天的上課日期</h2><p>兩天可以自由搭配平日與假日。已額滿的場次將無法選擇。</p></div>
+            <div class="section-copy"><p class="eyebrow mint">Choose Your Dates</p><h2>選擇月份與兩天日期</h2><p>先選月份，兩天可以自由搭配平日與假日。已額滿的場次將無法選擇。</p></div>
+            <label data-cohort-picker hidden>選擇上課月份<select name="cohortId" data-cohort-select><option value="">請選擇月份</option></select></label>
             <fieldset class="session-group"><legend>第一天 Day 1</legend><div class="session-options" data-day-1></div></fieldset>
             <fieldset class="session-group"><legend>第二天 Day 2</legend><div class="session-options" data-day-2></div></fieldset>
           </section>
@@ -78,4 +79,3 @@
     <script src="config.js"></script><script src="teacher-intake.js"></script>
   </body>
 </html>
-

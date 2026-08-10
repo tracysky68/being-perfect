@@ -24,6 +24,7 @@ Deno.serve(async (request) => {
     const token = String(payload.token ?? "").trim();
     const day1SessionId = String(payload.day1SessionId ?? "").trim();
     const day2SessionId = String(payload.day2SessionId ?? "").trim();
+    const cohortId = payload.cohortId ? String(payload.cohortId).trim() : null;
     const intake = payload.intake ?? {};
     const ageGroups = Array.isArray(intake.studentAgeGroups) ? intake.studentAgeGroups.slice(0, 8).map(String) : [];
     const challenges = Array.isArray(intake.mainChallenges) ? intake.mainChallenges.slice(0, 8).map(String) : [];
@@ -53,12 +54,13 @@ Deno.serve(async (request) => {
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serverKey());
     const { error } = await supabase.rpc("submit_teacher_intake", {
-      access_token: token, day_1_session_id: day1SessionId, day_2_session_id: day2SessionId, intake: cleanIntake
+      access_token: token, selected_cohort_id: cohortId, day_1_session_id: day1SessionId, day_2_session_id: day2SessionId, intake: cleanIntake
     });
     if (error) {
       if (error.message.includes("SESSION_FULL")) return jsonResponse({ message: "你選擇的場次剛好額滿，請重新選擇" }, 409, cors);
       if (error.message.includes("PAYMENT_REQUIRED")) return jsonResponse({ message: "付款尚未確認" }, 403, cors);
       if (error.message.includes("INVALID_TOKEN")) return jsonResponse({ message: "這個專屬連結無效" }, 404, cors);
+      if (error.message.includes("INVALID_COHORT")) return jsonResponse({ message: "請選擇有效的上課月份" }, 422, cors);
       console.error("submit-teacher-intake", error);
       return jsonResponse({ message: "目前無法儲存，請稍後再試" }, 500, cors);
     }

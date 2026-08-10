@@ -27,10 +27,15 @@ Deno.serve(async (request) => {
   if (!enrollment) return jsonResponse({ message: "找不到報名資料" }, 404, cors);
   if (!["paid", "partially_paid"].includes(enrollment.status)) return jsonResponse({ message: "付款尚未確認，確認後即可填寫" }, 403, cors);
 
-  const [{ data: student }, { data: cohort }, { data: sessions }, { data: selections }, { data: intake }, { data: occupied }] = await Promise.all([
+  const { data: cohort } = await supabase.from("cohorts").select("title,course_id").eq("id", enrollment.cohort_id).single();
+  const cohortSelectionRequired = cohort?.title === "待學員選擇月份";
+  const { data: availableCohorts } = cohortSelectionRequired
+    ? await supabase.from("cohorts").select("id,title").eq("course_id", cohort.course_id).eq("active", true).neq("title", "待學員選擇月份").order("starts_at")
+    : { data: [{ id: enrollment.cohort_id, title: cohort?.title ?? "教師專班" }] };
+  const cohortIds = (availableCohorts ?? []).map((item) => item.id);
+  const [{ data: student }, { data: sessions }, { data: selections }, { data: intake }, { data: occupied }] = await Promise.all([
     supabase.from("students").select("full_name,email").eq("id", enrollment.student_id).single(),
-    supabase.from("cohorts").select("title").eq("id", enrollment.cohort_id).single(),
-    supabase.from("course_sessions").select("id,module,schedule_type,title,starts_at,ends_at,capacity").eq("cohort_id", enrollment.cohort_id).eq("active", true).order("starts_at"),
+    supabase.from("course_sessions").select("id,cohort_id,module,schedule_type,title,starts_at,ends_at,capacity").in("cohort_id", cohortIds).eq("active", true).order("starts_at"),
     supabase.from("enrollment_sessions").select("session_id,module").eq("enrollment_id", enrollment.id).in("status", ["confirmed", "admin_assigned"]),
     supabase.from("teacher_intake_responses").select("role_title,organization,teaching_years,student_age_groups,art_background,education_background,main_challenges,focus_questions,learning_expectations,case_description,artwork_permission,additional_notes,submitted_at").eq("enrollment_id", enrollment.id).maybeSingle(),
     supabase.from("enrollment_sessions").select("session_id").in("status", ["confirmed", "admin_assigned"])
@@ -44,8 +49,10 @@ Deno.serve(async (request) => {
   return jsonResponse({
     student: { name: student?.full_name ?? "學員", email: student?.email ?? "" },
     cohort: cohort?.title ?? "教師專班",
+    cohortSelectionRequired,
+    cohorts: availableCohorts ?? [],
     sessions: (sessions ?? []).map((session) => ({
-      id: session.id, module: session.module, scheduleType: session.schedule_type, title: session.title,
+      id: session.id, cohortId: session.cohort_id, module: session.module, scheduleType: session.schedule_type, title: session.title,
       startsAt: session.starts_at, endsAt: session.ends_at,
       remaining: Math.max(0, session.capacity - (counts[session.id] ?? 0))
     })),

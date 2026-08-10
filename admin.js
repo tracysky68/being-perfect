@@ -51,7 +51,7 @@ function populateCohorts() {
   const current = select.value;
   select.innerHTML = '<option value="">全部梯次</option>'+[...new Set(records.map(r=>r.cohort))].sort().map(v=>`<option>${escapeHtml(v)}</option>`).join("");
   select.value = current;
-  document.querySelector("#manual-cohort").innerHTML = '<option value="">請選擇梯次</option>'+cohorts.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.title)}</option>`).join("");
+  document.querySelector("#manual-cohort").innerHTML = '<option value="">由學員在課前表單選擇</option>'+cohorts.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.title)}</option>`).join("");
 }
 
 function filteredRecords() {

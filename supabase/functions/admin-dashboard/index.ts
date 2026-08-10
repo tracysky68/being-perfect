@@ -36,14 +36,16 @@ async function createManualEnrollment(request: Request, supabase: ReturnType<typ
   const paidDate = String(payload.paidDate ?? "");
   const method = String(payload.manualMethod ?? "");
   const notes = String(payload.adminNotes ?? "").trim();
-  if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\+?\d{8,15}$/.test(phone) || !cohortId || !Number.isInteger(amount) || amount < 1 || !/^\d{4}-\d{2}-\d{2}$/.test(paidDate) || !["bank_transfer", "payuni_link", "cash", "other"].includes(method)) {
+  if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\+?\d{8,15}$/.test(phone) || !Number.isInteger(amount) || amount < 1 || !/^\d{4}-\d{2}-\d{2}$/.test(paidDate) || !["bank_transfer", "payuni_link", "cash", "other"].includes(method)) {
     return json({ message: "請確認所有必填資料" }, 422, cors);
   }
-  const { data: cohort } = await supabase.from("cohorts").select("id,title,active").eq("id", cohortId).single();
-  if (!cohort?.active) return json({ message: "此梯次目前無法使用" }, 409, cors);
+  const { data: cohort } = cohortId
+    ? await supabase.from("cohorts").select("id,title,active").eq("id", cohortId).single()
+    : await supabase.from("cohorts").select("id,title,active").eq("title", "待學員選擇月份").single();
+  if (!cohort || (cohortId && !cohort.active)) return json({ message: "此梯次目前無法使用" }, 409, cors);
   const { data: existingStudent } = await supabase.from("students").select("id").eq("email", email).maybeSingle();
   if (existingStudent) {
-    const { data: duplicate } = await supabase.from("enrollments").select("id").eq("student_id", existingStudent.id).eq("cohort_id", cohortId).in("status", ["paid", "partially_paid"]).maybeSingle();
+    const { data: duplicate } = await supabase.from("enrollments").select("id").eq("student_id", existingStudent.id).eq("cohort_id", cohort.id).in("status", ["paid", "partially_paid"]).maybeSingle();
     if (duplicate) return json({ message: "這位學員在同一梯次已有已付款紀錄" }, 409, cors);
   }
   const { data: student, error: studentError } = await supabase.from("students").upsert({ email, full_name: name, phone, updated_at: new Date().toISOString() }, { onConflict: "email" }).select("id").single();
@@ -51,7 +53,7 @@ async function createManualEnrollment(request: Request, supabase: ReturnType<typ
   const paidAt = new Date(`${paidDate}T12:00:00+08:00`).toISOString();
   const orderNumber = `MAN${Date.now()}${crypto.randomUUID().slice(0, 4)}`.replaceAll("-", "").toUpperCase();
   const { data: enrollment, error: enrollmentError } = await supabase.from("enrollments").insert({
-    order_number: orderNumber, student_id: student.id, cohort_id: cohortId, status: "paid", amount_twd: amount,
+    order_number: orderNumber, student_id: student.id, cohort_id: cohort.id, status: "paid", amount_twd: amount,
     payment_option: "full", payment_source: "manual", admin_notes: notes || null,
     privacy_consent_at: paidAt, terms_consent_at: paidAt, paid_at: paidAt,
   }).select("id").single();
