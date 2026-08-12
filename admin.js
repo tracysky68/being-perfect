@@ -81,7 +81,39 @@ function openDetail(id) {
   const r = records.find(item=>item.id===id); if(!r)return;
   const intake = r.intake;
   document.querySelector("#student-detail").innerHTML = `<div class="detail-head"><span class="section-no">STUDENT FILE</span><h2>${escapeHtml(r.name)}</h2><p>${escapeHtml(r.cohort)} · ${escapeHtml(r.orderNumber)}</p></div><div class="detail-grid"><section class="detail-section"><h3>聯絡與付款</h3><dl><dt>Email</dt><dd>${escapeHtml(r.email)}</dd><dt>手機</dt><dd>${escapeHtml(r.phone)}</dd><dt>付款狀態</dt><dd>${paymentBadge(r)} ${money(r.amountTwd)}</dd><dt>付款時間</dt><dd>${dateTime(r.paidAt)}</dd><dt>確認信</dt><dd>${escapeHtml(r.emailStatusLabel)}</dd></dl></section><section class="detail-section"><h3>上課日期</h3><dl>${r.sessions.map(s=>`<dt>${s.module==="day_1"?"第一天":"第二天"}</dt><dd>${escapeHtml(s.title)}<br>${dateTime(s.startsAt)}</dd>`).join("")||"尚未選擇"}</dl></section>${intake?`<section class="detail-section"><h3>教學背景</h3><dl><dt>目前身分</dt><dd>${escapeHtml(intake.currentRole)}</dd><dt>單位</dt><dd>${escapeHtml(intake.organization)||"—"}</dd><dt>年資</dt><dd>${escapeHtml(intake.teachingYears)}</dd><dt>學生年齡</dt><dd>${tags(intake.studentAgeGroups)}</dd><dt>藝術背景</dt><dd>${escapeHtml(intake.artBackground)}</dd><dt>教育背景</dt><dd>${escapeHtml(intake.educationBackground)}</dd></dl></section><section class="detail-section"><h3>教學需求</h3><dl><dt>主要挑戰</dt><dd>${tags(intake.mainChallenges)}</dd><dt>最想釐清</dt><dd>${escapeHtml(intake.focusQuestions)}</dd><dt>學習期待</dt><dd>${escapeHtml(intake.learningExpectations)}</dd></dl></section><section class="detail-section wide"><h3>補充資料</h3><dl><dt>案例描述</dt><dd>${escapeHtml(intake.caseDescription)||"—"}</dd><dt>其他備註</dt><dd>${escapeHtml(intake.additionalNotes)||"—"}</dd><dt>作品使用同意</dt><dd>${intake.artworkPermission?"同意":"不同意"}</dd><dt>提交時間</dt><dd>${dateTime(intake.submittedAt)}</dd></dl></section>`:`<section class="detail-section wide"><h3>課前資料</h3><p>學員尚未完成填寫。</p></section>`}</div>`;
+  if (["paid", "partially_paid"].includes(r.status)) {
+    document.querySelector("#student-detail .detail-section").insertAdjacentHTML("beforeend", `<div class="detail-email-action"><button type="button" data-resend-intake>補寄課前表單</button><p data-resend-status class="form-status" role="status"></p></div>`);
+    document.querySelector("[data-resend-intake]").addEventListener("click", () => resendIntakeEmail(r));
+  }
   dialog.showModal();
+}
+
+async function resendIntakeEmail(record) {
+  if (!window.confirm(`確定要將課前表單補寄至 ${record.email} 嗎？`)) return;
+  const button = document.querySelector("[data-resend-intake]");
+  const status = document.querySelector("[data-resend-status]");
+  button.disabled = true;
+  status.textContent = "正在補寄課前表單…";
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("登入狀態已失效，請重新登入。");
+    const response = await fetch(config.adminEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action: "resend_intake_email", enrollmentId: record.id }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.emailSent) throw new Error(result.message || "補寄失敗");
+    record.emailStatus = "sent";
+    record.emailStatusLabel = "已寄送";
+    status.textContent = `已成功補寄至 ${record.email}。`;
+    button.textContent = "已補寄，可再次寄送";
+    renderRows();
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function exportCsv() {
