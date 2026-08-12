@@ -27,6 +27,7 @@ async function authenticate(request: Request, supabase: ReturnType<typeof create
 
 async function createManualEnrollment(request: Request, supabase: ReturnType<typeof createClient>, userEmail: string, cors: HeadersInit) {
   const payload = await request.json();
+  if (payload.action === "resend_intake_email") return await resendIntakeEmail(payload, supabase, userEmail, cors);
   if (payload.action !== "create_manual_paid") return json({ message: "不支援的操作" }, 400, cors);
   const name = String(payload.name ?? "").trim();
   const email = String(payload.email ?? "").trim().toLowerCase();
@@ -84,6 +85,32 @@ async function createManualEnrollment(request: Request, supabase: ReturnType<typ
     }
   }
   return json({ id: enrollment.id, orderNumber, emailRequested, emailSent, emailError }, 201, cors);
+}
+
+async function resendIntakeEmail(payload: any, supabase: ReturnType<typeof createClient>, userEmail: string, cors: HeadersInit) {
+  const enrollmentId = String(payload.enrollmentId ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(enrollmentId)) return json({ message: "學員資料不正確" }, 422, cors);
+  const { data: enrollment, error } = await supabase.from("enrollments")
+    .select("id,order_number,status,students!inner(full_name,email),cohorts!inner(title),enrollment_portal_tokens!inner(token)")
+    .eq("id", enrollmentId).single();
+  if (error || !enrollment || !["paid", "partially_paid"].includes(enrollment.status)) return json({ message: "找不到可寄送的已付款學員" }, 404, cors);
+  const student = Array.isArray(enrollment.students) ? enrollment.students[0] : enrollment.students;
+  const cohort = Array.isArray(enrollment.cohorts) ? enrollment.cohorts[0] : enrollment.cohorts;
+  const portal = Array.isArray(enrollment.enrollment_portal_tokens) ? enrollment.enrollment_portal_tokens[0] : enrollment.enrollment_portal_tokens;
+  const intakeUrl = `${(Deno.env.get("PUBLIC_SITE_URL") ?? "https://beingperfect.com.tw").replace(/\/$/, "")}/teacher-intake.html?token=${encodeURIComponent(portal.token)}`;
+  const html = `<!doctype html><html lang="zh-Hant"><body style="margin:0;background:#f8f6ef;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC',sans-serif;color:#171717"><div style="max-width:620px;margin:0 auto;padding:32px 18px"><div style="background:#fff;border:2px solid #171717;border-radius:20px;padding:32px"><p style="color:#eb5656;font-weight:700">玩美學 Being Perfect</p><h1 style="font-size:28px">付款已確認，歡迎加入教師專班</h1><p>${safe(student.full_name)} 您好：</p><p style="line-height:1.8">我們已確認您的付款。請點選下方按鈕，選擇上課月份、兩天上課日期，並完成課前背景資料。</p><p><strong>梯次：</strong>${safe(cohort.title)}<br><strong>訂單編號：</strong>${safe(enrollment.order_number)}</p><p style="margin:28px 0"><a href="${intakeUrl}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;font-weight:700;padding:15px 24px;border-radius:10px">填寫上課日期與課前資料</a></p><p style="font-size:13px;color:#666">此連結為您的專屬連結，請勿轉傳。</p></div></div></body></html>`;
+  const { data: delivery } = await supabase.from("email_deliveries").upsert({ enrollment_id: enrollment.id, template: "payment_confirmed_teacher_intake", recipient: student.email, status: "pending", attempts: 1, last_error: null, updated_at: new Date().toISOString() }, { onConflict: "enrollment_id,template" }).select("id").single();
+  try {
+    const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${Deno.env.get("RESEND_API_KEY")}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: Deno.env.get("EMAIL_FROM") ?? "玩美學 <course@mail.beingperfect.com.tw>", to: [student.email], subject: "付款確認｜請選擇上課月份並完成課前資料", html }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result?.message ?? `HTTP ${response.status}`);
+    await supabase.from("email_deliveries").update({ status: "sent", provider_message_id: result.id, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", delivery.id);
+    await supabase.from("audit_logs").insert({ entity_type: "enrollment", entity_id: enrollment.id, action: "intake_email_resent", actor: userEmail, details: { recipient: student.email } });
+    return json({ emailSent: true }, 200, cors);
+  } catch (sendError) {
+    await supabase.from("email_deliveries").update({ status: "failed", last_error: String(sendError).slice(0, 1000), updated_at: new Date().toISOString() }).eq("id", delivery.id);
+    return json({ message: "信件寄送失敗" }, 502, cors);
+  }
 }
 
 Deno.serve(async (request) => {
