@@ -46,6 +46,11 @@ function updateMetrics() {
   document.querySelector("#metric-paid").textContent = records.filter(r=>["paid","partially_paid"].includes(r.status)).length;
   document.querySelector("#metric-intake").textContent = records.filter(r=>r.intake).length;
   document.querySelector("#metric-action").textContent = records.filter(r=>["payment_failed","refunding"].includes(r.status)||r.emailStatus==="failed").length;
+  const expected = records.reduce((sum, r) => sum + Number(r.expectedAmountTwd ?? r.amountTwd ?? 0), 0);
+  const received = records.reduce((sum, r) => sum + Number(r.paidAmountTwd ?? 0), 0);
+  document.querySelector("#revenue-received").textContent = money(received);
+  document.querySelector("#revenue-outstanding").textContent = money(Math.max(expected - received, 0));
+  document.querySelector("#revenue-expected").textContent = money(expected);
 }
 
 function populateCohorts() {
