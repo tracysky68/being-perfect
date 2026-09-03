@@ -35,7 +35,7 @@
         <div class="panel-heading"><span>01</span><div><p class="eyebrow mint">Registration</p><h2>建立你的報名資料</h2><p>付款成功後，系統會以這組 Email 寄送確認信與課前資料。</p></div></div>
         <form id="enrollment-form" class="enrollment-form" novalidate>
           <input type="hidden" name="courseCode" value="TEACHER-DIALOGUE">
-          <label>姓名／稱呼<input name="name" autocomplete="name" maxlength="80" required placeholder="例如：曾薇玲"></label>
+          <label>姓名／稱呼<input name="name" autocomplete="name" maxlength="80" required></label>
           <div class="field-pair">
             <label>Email<input type="email" name="email" autocomplete="email" maxlength="254" required placeholder="name@example.com"></label>
             <label>手機號碼<input type="tel" name="phone" autocomplete="tel" inputmode="tel" maxlength="20" required placeholder="09xxxxxxxx"></label>
@@ -50,8 +50,8 @@
             <legend>課程費用</legend>
             <input type="hidden" name="pricingCode" value="GENERAL-2026">
             <div class="fixed-price-card">
-              <span><b>教師專班</b><small>正式課程費用</small></span>
-              <strong>NT$13,800</strong>
+              <span><b data-plan-title>教師專班</b><small data-plan-subtitle>正式課程費用</small></span>
+              <strong data-plan-price>NT$13,800</strong>
             </div>
           </fieldset>
           <fieldset class="payment-fieldset">

@@ -4,9 +4,13 @@ const cohortSelect = enrollmentForm?.elements.cohortId;
 const paymentOptions = document.querySelector("[data-payment-options]");
 
 const fallbackPlans = {
-  "GENERAL-2026": { totalAmountTwd: 13800, installmentCount: 3, installmentAmountTwd: 4600 }
+  "GENERAL-2026": { title: "一般學員", totalAmountTwd: 13800, installmentCount: 3, installmentAmountTwd: 4600 },
+  "PARENT-ALUMNI-2026": { title: "家長班舊生優惠", totalAmountTwd: 10800, installmentCount: 3, installmentAmountTwd: 3600 }
 };
 let pricingPlans = fallbackPlans;
+const requestedPlanCode = new URLSearchParams(window.location.search).get("plan");
+const activePlanCode = Object.hasOwn(fallbackPlans, requestedPlanCode) ? requestedPlanCode : "GENERAL-2026";
+enrollmentForm.elements.pricingCode.value = activePlanCode;
 
 function money(amount) {
   return `NT$${Number(amount).toLocaleString("zh-TW")}`;
@@ -20,6 +24,9 @@ function updateCheckoutSummary() {
   document.querySelector("[data-full-amount]").textContent = `本次付款 ${money(plan.totalAmountTwd)}`;
   document.querySelector("[data-installment-amount]").textContent = `每期 ${money(plan.installmentAmountTwd)}，共 ${plan.installmentCount} 期`;
   document.querySelector("[data-checkout-total]").textContent = money(paymentOption === "installments" ? plan.installmentAmountTwd : plan.totalAmountTwd);
+  document.querySelector("[data-plan-title]").textContent = pricingCode === "PARENT-ALUMNI-2026" ? "教師專班｜家長班舊生" : "教師專班";
+  document.querySelector("[data-plan-subtitle]").textContent = pricingCode === "PARENT-ALUMNI-2026" ? "舊生專屬優惠" : "正式課程費用";
+  document.querySelector("[data-plan-price]").textContent = money(plan.totalAmountTwd);
   document.querySelectorAll(".payment-choice").forEach((item) => item.classList.toggle("is-selected", item.querySelector("input").checked));
 }
 
@@ -44,8 +51,7 @@ async function loadCohorts() {
       cohortSelect.append(option);
     });
     if (result.pricingPlans?.length) {
-      const generalPlan = result.pricingPlans.find((plan) => plan.code === "GENERAL-2026");
-      if (generalPlan) pricingPlans = { "GENERAL-2026": generalPlan };
+      pricingPlans = Object.fromEntries(result.pricingPlans.map((plan) => [plan.code, plan]));
       updateCheckoutSummary();
     }
     if (!availableCohorts.length) cohortSelect.innerHTML = '<option value="">目前尚無開放報名月份</option>';
