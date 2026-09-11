@@ -90,7 +90,39 @@ function openDetail(id) {
     document.querySelector("#student-detail .detail-section").insertAdjacentHTML("beforeend", `<div class="detail-email-action"><button type="button" data-resend-intake>補寄課前表單</button><p data-resend-status class="form-status" role="status"></p></div>`);
     document.querySelector("[data-resend-intake]").addEventListener("click", () => resendIntakeEmail(r));
   }
+  document.querySelector("#student-detail").insertAdjacentHTML("beforeend", `<section class="detail-danger-zone"><div><h3>刪除學員資料</h3><p>永久刪除此筆報名、付款、選課與課前資料。此操作無法復原。</p></div><button type="button" data-delete-student>刪除學員</button><p data-delete-status class="form-status" role="status"></p></section>`);
+  document.querySelector("[data-delete-student]").addEventListener("click", () => deleteStudent(r));
   dialog.showModal();
+}
+
+async function deleteStudent(record) {
+  if (!window.confirm(`確定要永久刪除「${record.name}」的這筆報名資料嗎？\n\n刪除後無法復原。`)) return;
+  const typedName = window.prompt(`為避免誤刪，請輸入學員姓名「${record.name}」確認：`);
+  if (typedName === null) return;
+  if (typedName.trim() !== record.name) {
+    window.alert("姓名不一致，已取消刪除。");
+    return;
+  }
+  const button = document.querySelector("[data-delete-student]");
+  const status = document.querySelector("[data-delete-status]");
+  button.disabled = true;
+  status.textContent = "正在刪除學員資料…";
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("登入狀態已失效，請重新登入。");
+    const response = await fetch(config.adminEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ action: "delete_enrollment", enrollmentId: record.id, confirmationName: typedName.trim() }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.deleted) throw new Error(result.message || "刪除失敗");
+    dialog.close();
+    await loadData();
+  } catch (error) {
+    status.textContent = error.message;
+    button.disabled = false;
+  }
 }
 
 async function resendIntakeEmail(record) {

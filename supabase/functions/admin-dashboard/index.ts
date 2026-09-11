@@ -28,6 +28,7 @@ async function authenticate(request: Request, supabase: ReturnType<typeof create
 async function createManualEnrollment(request: Request, supabase: ReturnType<typeof createClient>, userEmail: string, cors: HeadersInit) {
   const payload = await request.json();
   if (payload.action === "resend_intake_email") return await resendIntakeEmail(payload, supabase, userEmail, cors);
+  if (payload.action === "delete_enrollment") return await deleteEnrollment(payload, supabase, userEmail, cors);
   if (payload.action !== "create_manual_paid") return json({ message: "不支援的操作" }, 400, cors);
   const name = String(payload.name ?? "").trim();
   const email = String(payload.email ?? "").trim().toLowerCase();
@@ -85,6 +86,30 @@ async function createManualEnrollment(request: Request, supabase: ReturnType<typ
     }
   }
   return json({ id: enrollment.id, orderNumber, emailRequested, emailSent, emailError }, 201, cors);
+}
+
+async function deleteEnrollment(payload: any, supabase: ReturnType<typeof createClient>, userEmail: string, cors: HeadersInit) {
+  const enrollmentId = String(payload.enrollmentId ?? "");
+  const confirmationName = String(payload.confirmationName ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(enrollmentId) || !confirmationName) return json({ message: "刪除確認資料不完整" }, 422, cors);
+
+  const { data: enrollment, error } = await supabase.from("enrollments")
+    .select("id,order_number,student_id,students!inner(full_name,email)")
+    .eq("id", enrollmentId).single();
+  const student = Array.isArray(enrollment?.students) ? enrollment.students[0] : enrollment?.students;
+  if (error || !enrollment || !student) return json({ message: "找不到這筆學員資料" }, 404, cors);
+  if (student.full_name !== confirmationName) return json({ message: "確認姓名不一致，已取消刪除" }, 409, cors);
+
+  const auditDetails = { orderNumber: enrollment.order_number, studentName: student.full_name, studentEmail: student.email };
+  const { error: transactionError } = await supabase.from("payment_transactions").delete().eq("enrollment_id", enrollmentId);
+  if (transactionError) throw transactionError;
+  const { error: deleteError } = await supabase.from("enrollments").delete().eq("id", enrollmentId);
+  if (deleteError) throw deleteError;
+
+  const { count } = await supabase.from("enrollments").select("id", { count: "exact", head: true }).eq("student_id", enrollment.student_id);
+  if (count === 0) await supabase.from("students").delete().eq("id", enrollment.student_id);
+  await supabase.from("audit_logs").insert({ entity_type: "enrollment", entity_id: enrollmentId, action: "enrollment_permanently_deleted", actor: userEmail, details: auditDetails });
+  return json({ deleted: true }, 200, cors);
 }
 
 async function resendIntakeEmail(payload: any, supabase: ReturnType<typeof createClient>, userEmail: string, cors: HeadersInit) {
