@@ -15,6 +15,33 @@ const passwordDialog = document.querySelector("#password-dialog");
 const passwordForm = document.querySelector("#password-form");
 let records = [];
 let cohorts = [];
+const overviewOrigin = "https://being-perfect-core-workbench.onrender.com";
+const overviewNonce = new URLSearchParams(location.hash.slice(1)).get("overview");
+const overviewBridgeActive = /^[0-9a-f]{32}$/.test(overviewNonce ?? "") && !!window.opener;
+let overviewRun = 0;
+function sendOverview(type, snapshot) {
+  if (overviewBridgeActive && !window.opener.closed) window.opener.postMessage({ type, nonce: overviewNonce, snapshot }, overviewOrigin);
+}
+async function readTeacherOverview() {
+  if (!overviewBridgeActive) return;
+  const run = ++overviewRun;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw Error("NO_SESSION");
+    const url = new URL(config.adminEndpoint);
+    url.searchParams.set("view", "teacher-overview");
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store" });
+    if (!response.ok) throw Error("SUMMARY_UNAVAILABLE");
+    const snapshot = await response.json();
+    if (run === overviewRun) sendOverview("wan-teacher-summary", snapshot);
+  } catch {
+    if (run === overviewRun) sendOverview("wan-teacher-disconnected", null);
+  }
+}
+if (overviewBridgeActive) window.addEventListener("message", event => {
+  if (event.source === window.opener && event.origin === overviewOrigin &&
+      event.data?.type === "wan-teacher-refresh" && event.data?.nonce === overviewNonce) readTeacherOverview();
+});
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':"&quot;"}[char]));
 const money = (value) => `NT$${Number(value || 0).toLocaleString("zh-TW")}`;
@@ -39,6 +66,7 @@ async function loadData() {
   records = result.records; cohorts = result.cohorts || [];
   updateMetrics(); populateCohorts(); renderRows();
   document.querySelector("#last-updated").textContent = `更新：${dateTime(new Date())}`;
+  readTeacherOverview();
 }
 
 function updateMetrics() {
@@ -194,7 +222,7 @@ document.querySelector("#toggle-password").addEventListener("click",()=>{const i
 document.querySelector("#change-password-button").addEventListener("click",()=>{passwordForm.reset();document.querySelector("#password-status").textContent="";passwordDialog.showModal();});
 document.querySelector(".password-close").addEventListener("click",()=>passwordDialog.close());
 passwordForm.addEventListener("submit",async(e)=>{e.preventDefault();const data=new FormData(passwordForm);const password=String(data.get("newPassword"));const confirm=String(data.get("confirmPassword"));const status=document.querySelector("#password-status");if(password!==confirm){status.textContent="兩次輸入的密碼不一致。";return;}status.textContent="正在儲存…";const {error}=await supabase.auth.updateUser({password});if(error){status.textContent=`儲存失敗：${error.message}`;return;}status.textContent="密碼已更新完成。";setTimeout(()=>passwordDialog.close(),1000);});
-document.querySelector("#logout-button").addEventListener("click",async()=>{await supabase.auth.signOut();showLogin("已安全登出。");});
+document.querySelector("#logout-button").addEventListener("click",async()=>{++overviewRun;sendOverview("wan-teacher-disconnected",null);await supabase.auth.signOut();showLogin("已安全登出。");});
 document.querySelector("#manual-add-button").addEventListener("click",openManualForm);document.querySelector(".manual-close").addEventListener("click",()=>manualDialog.close());
 document.querySelector("#refresh-button").addEventListener("click",loadData);document.querySelector("#export-button").addEventListener("click",exportCsv);document.querySelectorAll("#search-input,#cohort-filter,#status-filter").forEach(el=>el.addEventListener(el.tagName==="INPUT"?"input":"change",renderRows));document.querySelector(".dialog-close").addEventListener("click",()=>dialog.close());dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close();});
 const {data:{session}}=await supabase.auth.getSession();session?showDashboard():showLogin();supabase.auth.onAuthStateChange((_event,next)=>{if(next&&dashboardView.hidden)showDashboard();});
