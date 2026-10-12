@@ -29,7 +29,7 @@ async function readTeacherOverview() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw Error("NO_SESSION");
     const url = new URL(config.adminEndpoint);
-    url.searchParams.set("view", "teacher-overview");
+    url.pathname = url.pathname.replace(/\/admin-dashboard$/, "/teacher-overview");
     const response = await fetch(url, { headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store" });
     if (!response.ok) throw Error("SUMMARY_UNAVAILABLE");
     const snapshot = await response.json();
