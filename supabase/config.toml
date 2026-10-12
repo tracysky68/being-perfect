@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.admin-dashboard]
 verify_jwt = false
+
+[functions.teacher-overview]
+verify_jwt = false
