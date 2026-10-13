@@ -1,6 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") ?? "";
+const centralOrigin = Deno.env.get("OVERVIEW_CENTRAL_ORIGIN") === "https://being-perfect-core-workbench.onrender.com"
+  ? "https://being-perfect-core-workbench.onrender.com" : "";
+const allowedOrigins = new Set([allowedOrigin,centralOrigin].filter(Boolean));
 const corsHeaders = (origin: string) => ({
   "Access-Control-Allow-Origin": origin,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -66,9 +69,9 @@ async function teacherOverview(supabase: ReturnType<typeof createClient>, cors: 
 
 Deno.serve(async (request) => {
   const origin = request.headers.get("origin") ?? "";
-  const cors = corsHeaders(origin === allowedOrigin ? origin : allowedOrigin);
+  const cors = corsHeaders(allowedOrigins.has(origin) ? origin : allowedOrigin);
   if (request.method === "OPTIONS") return new Response(null, { headers: cors });
-  if (request.method !== "GET" || !allowedOrigin || origin !== allowedOrigin) return json({ message: "Request not allowed" }, 403, cors);
+  if (request.method !== "GET" || !allowedOrigin || !allowedOrigins.has(origin)) return json({ message: "Request not allowed" }, 403, cors);
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serverKey());
     const user = await authenticate(request, supabase);
