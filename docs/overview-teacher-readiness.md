@@ -2,7 +2,9 @@
 
 沿用原教師後台 `admin.html`、Supabase 管理員登入與 `admin-dashboard`。中控只收到統計、核准梯次名稱與本次讀取時間；原後台繼續處理個別報名。沒有新增管理員、放寬既有完整名冊 API 的 CORS，亦不將姓名、聯絡方式、訂單編號、答案或金額傳送至中控。
 
-新讀取模式是獨立的 `GET teacher-overview`，不再修改原 `admin-dashboard` 的 GET／POST 行為。原管理頁仍使用 `admin-dashboard` 讀寫名冊，只有中控連線模式會請求 `teacher-overview`。新 Function 須同時符合原 `ADMIN_EMAILS`、原 `ALLOWED_ORIGIN`，以及下列三項明確設定，缺一即回 403：
+新讀取模式是獨立的 `GET teacher-overview`，不再修改原 `admin-dashboard` 的 GET／POST 行為。原管理頁仍使用 `admin-dashboard` 讀寫名冊，只有中控連線模式會請求 `teacher-overview`。原後台連線須同時符合 `ADMIN_EMAILS`、原 `ALLOWED_ORIGIN`，以及下列三項明確設定，缺一即回 403：
+
+2026-10-12 的中控單次登入隔離候選只在 `OVERVIEW_CENTRAL_ORIGIN` 精確設為 `https://being-perfect-core-workbench.onrender.com` 時，額外允許該來源向**同一** `teacher-overview` Function 提出 GET；管理員 token、原三項梯次／期限設定仍照常檢查，`admin-dashboard` 與原後台來源限制不變。此選項預設關閉，尚未部署。中控端也預設關閉，需獨立啟用 `OVERVIEW_TEACHER_SERVER_READ=enabled`。10/13 已唯讀核對正式 Supabase Auth 唯一使用者 UID 等於中控固定 subject，正式 `ADMIN_EMAILS` 摘要與該帳號電子郵件完全相符；原教師後台可載入 13 筆名冊。不得偽裝原後台 Origin 或共用密碼。
 
 - `OVERVIEW_TEACHER_COURSE_ID`：教師專班 course UUID。
 - `OVERVIEW_TEACHER_COHORT_IDS`：本次核准的 1–12 個 cohort UUID，以逗號分隔；每個必須屬於上述 course。
