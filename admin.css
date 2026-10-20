@@ -3,3 +3,16 @@
 .detail-danger-zone{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px 24px;padding:24px 35px;background:#fff0ee;border-top:2px solid var(--coral)}.detail-danger-zone h3{margin:0 0 6px;color:#9d2927;font-size:.9rem}.detail-danger-zone p{margin:0;color:#70504d;font-size:.8rem}.detail-danger-zone button{padding:11px 16px;border:2px solid #9d2927;background:#fff;color:#9d2927;font-weight:900;cursor:pointer}.detail-danger-zone button:hover{background:#9d2927;color:#fff}.detail-danger-zone button:disabled{cursor:wait;opacity:.55}.detail-danger-zone .form-status{grid-column:1/-1;color:#9d2927}
 .revenue-panel{display:grid;grid-template-columns:1.15fr repeat(3,1fr);border-bottom:var(--line);background:var(--cream)}.revenue-panel>div,.revenue-panel article{min-height:155px;padding:25px 3vw;border-right:var(--line)}.revenue-panel article:last-child{border-right:0}.revenue-heading .kicker{margin:0 0 8px}.revenue-heading h2{margin:0 0 10px;font-size:1.8rem}.revenue-heading small,.revenue-panel article span,.revenue-panel article small{display:block;color:var(--muted);font-size:.78rem;font-weight:800}.revenue-panel article strong{display:block;margin:12px 0 8px;font-size:clamp(1.65rem,2.6vw,2.8rem);line-height:1;white-space:nowrap}.revenue-panel .revenue-total{background:var(--mint)}
 @media(max-width:820px){.revenue-panel{grid-template-columns:1fr 1fr}.revenue-panel>div,.revenue-panel article{border-bottom:var(--line)}.revenue-panel>*:nth-child(even){border-right:0}.revenue-panel>*:nth-last-child(-n+2){border-bottom:0}.detail-danger-zone{grid-template-columns:1fr}.detail-danger-zone button{width:100%}}
+
+/* 玩美學色票：與官方 LINE 客服台一致。 */
+:root{--ink:#1c453d;--paper:#fffaf0;--cream:#eaf5f5;--sun:#ffe8b0;--coral:#f15255;--mint:#d8f0e8;--muted:#566f69}
+.login-art{background:#50b3c3}
+.login-art h1 em{color:#9e222a}
+.login-card button,.export,.detail-email-action button{background:var(--coral);border-color:var(--coral);color:#fff}
+.metrics .sun{background:#fff1cf}
+.metrics .mint,.revenue-panel .revenue-total{background:#d8f0e8}
+.metrics .coral{background:#ffe4de}
+.detail-head{background:#eaf5f5}
+.dialog-close{background:var(--coral);color:#fff}
+tbody tr:hover{background:#f3faf6}
+.badge.warn{background:#fff1cf}
