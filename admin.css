@@ -16,3 +16,4 @@
 .dialog-close{background:var(--coral);color:#fff}
 tbody tr:hover{background:#f3faf6}
 .badge.warn{background:#fff1cf}
+[hidden]{display:none!important}
