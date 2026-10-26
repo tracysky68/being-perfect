@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { decryptPayuni, payuniHash, secureEqual } from "../_shared/payuni.ts";
+import { classifyPayuniNotification } from "../_shared/payuni-notification.ts";
 
 function supabaseServerKey() {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -73,41 +74,79 @@ Deno.serve(async (request) => {
     const orderNumber = details.MerTradeNo;
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, supabaseServerKey());
     const { data: transaction } = await supabase.from("payment_transactions")
-      .select("id,enrollment_id,payment_installment_id,amount_twd,enrollments!inner(id,status)")
+      .select("id,enrollment_id,payment_installment_id,amount_twd,provider,status,provider_trade_number,enrollments!inner(id,status,paid_at)")
       .eq("merchant_order_number", orderNumber).single();
-    const enrollment = transaction?.enrollments as { id: string; status: string } | undefined;
-    if (!transaction || !enrollment || Number(details.TradeAmt) !== transaction.amount_twd) {
-      if (transaction) await supabase.from("payment_transactions").update({ status: "needs_review", raw_notification: details, hash_verified: true, notified_at: new Date().toISOString() }).eq("id", transaction.id);
-      return new Response("Order mismatch", { status: 409 });
-    }
+    const enrollment = transaction?.enrollments as { id: string; status: string; paid_at: string | null } | undefined;
+    if (!transaction || !enrollment || transaction.provider !== "payuni") return new Response("Order mismatch", { status: 409 });
 
-    // PAYUNi 各 API 版本的成功欄位須以商店後台最新版文件及 sandbox 實測確認。
-    const success = ["SUCCESS", "1", "00"].includes(String(details.Status ?? details.TradeStatus ?? "").toUpperCase());
+    // PAYUNi's outer Status and decrypted TradeStatus are distinct. A pending
+    // trade must never become a paid enrollment or trigger its welcome email.
+    const decision = classifyPayuniNotification({
+      outerStatus: input.Status, details,
+      merchantId: Deno.env.get("PAYUNI_MERCHANT_ID") ?? "",
+      orderNumber: String(orderNumber ?? ""), amountTwd: transaction.amount_twd,
+      currentStatus: transaction.status, currentTradeNumber: transaction.provider_trade_number,
+    });
     const timestamp = new Date().toISOString();
-    await supabase.from("payment_transactions").update({
-      provider_trade_number: details.TradeNo ?? null, status: success ? "verified" : "failed",
-      payment_method: details.PaymentType ?? details.PayType ?? null, raw_notification: details,
-      hash_verified: true, notified_at: timestamp, verified_at: success ? timestamp : null
-    }).eq("id", transaction.id);
-    if (success) {
+    if (decision.kind === "review" && transaction.status === "verified") {
+      console.error("payuni-notify verified transaction conflict", { reason: decision.reason, transactionId: transaction.id });
+      return new Response("Verified transaction conflict", { status: 409 });
+    }
+    const nextStatus = decision.kind === "paid" ? "verified"
+      : decision.kind === "pending" ? "notified"
+      : decision.kind === "failed" ? "failed" : "needs_review";
+    // A retry after a partial database failure must finish installment and
+    // enrollment updates. Preserve the first verified timestamp on retries.
+    if (decision.kind !== "duplicate_paid") {
+      const { error: transactionError } = await supabase.from("payment_transactions").update({
+        provider_trade_number: details.TradeNo ?? null, status: nextStatus,
+        payment_method: details.PaymentType ?? details.PayType ?? null,
+        // Status is the unsigned outer field; TradeStatus remains in the
+        // hash-checked decrypted details. Both are retained for later audit.
+        raw_notification: { ...details, Status: input.Status ?? null, _outer_status_unverified: true },
+        hash_verified: true, notified_at: timestamp,
+        verified_at: decision.kind === "paid" ? timestamp : null,
+      }).eq("id", transaction.id);
+      if (transactionError) throw transactionError;
+    }
+    if (decision.kind === "review") return new Response("Notification needs review", { status: 409 });
+    if (decision.kind === "paid" || decision.kind === "duplicate_paid") {
       if (transaction.payment_installment_id) {
-        await supabase.from("payment_installments").update({ status: "paid", paid_at: timestamp, updated_at: timestamp }).eq("id", transaction.payment_installment_id);
+        const { error } = await supabase.from("payment_installments")
+          .update({ status: "paid", paid_at: timestamp, updated_at: timestamp })
+          .eq("id", transaction.payment_installment_id).neq("status", "paid");
+        if (error) throw error;
       }
-      const { count: unpaidCount } = await supabase.from("payment_installments")
+      const { count: unpaidCount, error: installmentCountError } = await supabase.from("payment_installments")
         .select("id", { count: "exact", head: true }).eq("enrollment_id", enrollment.id).neq("status", "paid");
+      if (installmentCountError || unpaidCount === null) throw installmentCountError ?? new Error("Installment count unavailable");
       const fullyPaid = unpaidCount === 0;
-      await supabase.from("enrollments").update({ status: fullyPaid ? "paid" : "partially_paid", paid_at: fullyPaid ? timestamp : null, updated_at: timestamp }).eq("id", enrollment.id);
+      const targetStatus = fullyPaid ? "paid" : "partially_paid";
+      if (decision.kind === "paid" || enrollment.status !== targetStatus) {
+        const { error } = await supabase.from("enrollments")
+          .update({ status: targetStatus, paid_at: fullyPaid ? enrollment.paid_at ?? timestamp : null, updated_at: timestamp }).eq("id", enrollment.id);
+        if (error) throw error;
+      }
       try {
         await sendPaymentEmail(supabase, enrollment.id);
       } catch (emailError) {
         // 金流通知仍須回覆成功；寄信失敗會記錄，PAYUNi 重送通知時可再嘗試。
         console.error("payment-confirmation-email", emailError);
       }
-    } else if (enrollment.status === "pending_payment") {
+    } else if (decision.kind === "failed" && enrollment.status === "pending_payment") {
       // 已付款訂單永不因延遲或重複的失敗通知而降級。
-      await supabase.from("enrollments").update({ status: "payment_failed", updated_at: timestamp }).eq("id", enrollment.id);
+      const { error } = await supabase.from("enrollments")
+        .update({ status: "payment_failed", updated_at: timestamp }).eq("id", enrollment.id);
+      if (error) throw error;
     }
-    await supabase.from("audit_logs").insert({ entity_type: "enrollment", entity_id: enrollment.id, action: success ? "payment_verified" : "payment_failed", details: { provider: "payuni" } });
+    if (decision.kind !== "duplicate_paid") {
+      const { error: auditError } = await supabase.from("audit_logs").insert({
+        entity_type: "enrollment", entity_id: enrollment.id,
+        action: decision.kind === "paid" ? "payment_verified" : decision.kind === "pending" ? "payment_pending" : "payment_failed",
+        details: { provider: "payuni" },
+      });
+      if (auditError) throw auditError;
+    }
     return new Response("SUCCESS", { status: 200 });
   } catch (error) {
     console.error("payuni-notify", error);
