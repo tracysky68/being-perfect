@@ -138,6 +138,24 @@ function openDetail(id) {
     document.querySelector("#student-detail .detail-section").insertAdjacentHTML("beforeend", `<div class="detail-email-action"><button type="button" data-resend-intake>補寄課前表單</button><p data-resend-status class="form-status" role="status"></p></div>`);
     document.querySelector("[data-resend-intake]").addEventListener("click", () => resendIntakeEmail(r));
   }
+  if (r.status === "paid") {
+    document.querySelector("#student-detail").insertAdjacentHTML("beforeend", `<section class="detail-section"><h3>官方 LINE 課前通知</h3><p>固定範本會帶入學員姓名、課程與專屬連結。複製後請一對一傳送給本人。</p><button type="button" data-prepare-line>產生 LINE 訊息</button><div data-line-result hidden><label>訊息內容<textarea data-line-message readonly rows="10" style="width:100%;box-sizing:border-box;margin:12px 0;padding:12px;font:inherit"></textarea></label><button type="button" data-copy-line>複製 LINE 訊息</button></div><p data-line-status role="status"></p></section>`);
+    const root=document.querySelector('[data-prepare-line]').closest('section');
+    root.querySelector('[data-prepare-line]').addEventListener('click',async()=>{
+      const button=root.querySelector('[data-prepare-line]'),status=root.querySelector('[data-line-status]');button.disabled=true;status.textContent='正在產生…';
+      try {
+        const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error('請重新登入');
+        const response=await fetch(config.adminEndpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({action:'prepare_line_intake',enrollmentId:r.id})});
+        const result=await response.json();if(!response.ok)throw new Error(result.message||'產生失敗');
+        root.querySelector('[data-line-message]').value=result.message;root.querySelector('[data-line-result]').hidden=false;status.textContent='訊息已備妥，尚未發送。';
+      }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+    });
+    root.querySelector('[data-copy-line]').addEventListener('click',async()=>{
+      const field=root.querySelector('[data-line-message]'),status=root.querySelector('[data-line-status]');
+      try{await navigator.clipboard.writeText(field.value);status.textContent='已複製，請貼到官方 LINE 傳給本人；尚未代為發送。';}
+      catch{field.focus();field.select();status.textContent='請手動複製已選取的訊息，再貼到官方 LINE。';}
+    });
+  }
   document.querySelector("#student-detail").insertAdjacentHTML("beforeend", `<section class="detail-danger-zone"><div><h3>刪除學員資料</h3><p>永久刪除此筆報名、付款、選課與課前資料。此操作無法復原。</p></div><button type="button" data-delete-student>刪除學員</button><p data-delete-status class="form-status" role="status"></p></section>`);
   document.querySelector("[data-delete-student]").addEventListener("click", () => deleteStudent(r));
   dialog.showModal();

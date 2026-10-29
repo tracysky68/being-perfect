@@ -53,6 +53,22 @@ async function createManualEnrollment(request: Request, supabase: ReturnType<typ
     }
     return json({cohortId:data},200,cors);
   }
+  if (payload.action === "prepare_line_intake") {
+    const { data: e, error } = await supabase.from("enrollments")
+      .select("status,contact_snapshot,students!inner(full_name),cohorts!inner(courses!inner(code,title)),enrollment_portal_tokens(token)")
+      .eq("id", String(payload.enrollmentId ?? "")).single();
+    if (error || !e) return json({message:"找不到報名資料"},404,cors);
+    if (e.status !== "paid") return json({message:"此範本僅適用已完款學員"},409,cors);
+    const portal = Array.isArray(e.enrollment_portal_tokens) ? e.enrollment_portal_tokens[0] : e.enrollment_portal_tokens;
+    if (!portal?.token) return json({message:"尚無專屬課前連結，請先確認報名資料"},409,cors);
+    const course = e.cohorts.courses;
+    const name = e.contact_snapshot?.name || e.students.full_name;
+    const title = course.code === "TEACHER-TRAINING" ? "創感力師資培訓" : course.title;
+    const page = course.code === "TEACHER-TRAINING" ? "training-intake.html" : "teacher-intake.html";
+    const url = `${(Deno.env.get("PUBLIC_SITE_URL") ?? "https://beingperfect.com.tw").replace(/\/$/, "")}/${page}?token=${encodeURIComponent(portal.token)}`;
+    const message = `${name}您好，已確認您完成「${title}」報名與付款！\n\n為了讓老師提前了解您的背景與學習期待，請協助填寫課前資料：\n\n${url}\n\n此為您的專屬連結，請勿轉傳。有任何問題，歡迎直接回覆我們，謝謝！`;
+    return json({message},200,cors);
+  }
   if (payload.action === "resend_intake_email") return await resendIntakeEmail(payload, supabase, userEmail, cors);
   if (payload.action === "delete_enrollment") return await deleteEnrollment(payload, supabase, userEmail, cors);
   if (payload.action !== "create_manual_paid") return json({ message: "不支援的操作" }, 400, cors);
