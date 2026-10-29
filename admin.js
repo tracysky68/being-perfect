@@ -164,7 +164,7 @@ function openDetail(id) {
       if(d||result.blocked){previewButton.disabled=true;sendButton.disabled=true;confirmBox.hidden=true;}
     };
     previewButton.disabled=true;
-    callLine('line_intake_status').then(result=>{showDelivery(result);previewButton.disabled=Boolean(result.delivery)||!result.configured;if(!result.configured)directStatus.textContent='官方 LINE 尚未完成串接設定，仍可使用上方複製功能。';}).catch(error=>{directStatus.textContent=error.message;});
+    callLine('line_intake_status').then(result=>{showDelivery(result);if(result.bound){root.querySelector('[data-line-recipient]').closest('label').hidden=true;root.querySelector('.line-direct-panel p').textContent='學員已完成本人 LINE 綁定，直接核對訊息即可發送。';}previewButton.disabled=Boolean(result.delivery)||!result.configured;if(!result.configured)directStatus.textContent='官方 LINE 尚未完成串接設定，仍可使用上方複製功能。';}).catch(error=>{directStatus.textContent=error.message;});
     root.querySelector('[data-line-recipient]').addEventListener('input',()=>{preview=null;confirmCheck.checked=false;sendButton.disabled=true;confirmBox.hidden=true;});
     confirmCheck.addEventListener('change',()=>{sendButton.disabled=!preview||!confirmCheck.checked;});
     previewButton.addEventListener('click',async()=>{
@@ -174,7 +174,7 @@ function openDetail(id) {
     });
     sendButton.addEventListener('click',async()=>{
       if(!preview||!confirmCheck.checked)return;sendButton.disabled=true;previewButton.disabled=true;root.querySelector('[data-line-recipient]').disabled=true;confirmCheck.disabled=true;directStatus.textContent='正在提交至官方 LINE，請勿重複操作…';
-      try{const result=await callLine('send_line_intake',{recipient:preview.userId,messageHash:preview.hash,displayName:preview.displayName,confirmed:true});showDelivery(result);}
+      try{const result=await callLine('send_line_intake',{recipient:preview.userId,bound:preview.bound,messageHash:preview.hash,displayName:preview.displayName,confirmed:true});showDelivery(result);}
       catch(error){directStatus.textContent=error.message+'；請重新開啟此學員查看發送紀錄，勿立即重送。';}
     });
     root.querySelector('[data-copy-line]').addEventListener('click',async()=>{

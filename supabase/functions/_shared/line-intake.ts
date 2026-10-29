@@ -10,7 +10,7 @@ export function parseLineRecipient(value:string){
  return id;
 }
 export async function intakeMessage(db:any,id:string){
- const {data:e,error}=await db.from('enrollments').select('status,contact_snapshot,students!inner(full_name),cohorts!inner(courses!inner(code,title)),enrollment_portal_tokens(token)').eq('id',id).single();
+ const {data:e,error}=await db.from('enrollments').select('student_id,status,contact_snapshot,students!inner(full_name),cohorts!inner(courses!inner(code,title)),enrollment_portal_tokens(token)').eq('id',id).single();
  if(error||!e)fail('找不到報名資料',404);
  if(e.status!=='paid')fail('此訊息僅適用已完款學員',409);
  const portal=Array.isArray(e.enrollment_portal_tokens)?e.enrollment_portal_tokens[0]:e.enrollment_portal_tokens;
@@ -21,7 +21,7 @@ export async function intakeMessage(db:any,id:string){
  const url=`${(Deno.env.get('PUBLIC_SITE_URL')||'https://beingperfect.com.tw').replace(/\/$/,'')}/${page}?token=${encodeURIComponent(portal.token)}`;
  const message=`${name}您好，已確認您完成「${title}」報名與付款！\n\n為了讓老師提前了解您的背景與學習期待，請協助填寫課前資料：\n\n${url}\n\n此為您的專屬連結，請勿轉傳。有任何問題，歡迎直接回覆我們，謝謝！`;
  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(message)))).map(x=>x.toString(16).padStart(2,'0')).join('');
- return {name,message,hash};
+ return {name,message,hash,studentId:e.student_id};
 }
 async function lineIdentity(userId:string){
  const token=Deno.env.get('LINE_CHANNEL_ACCESS_TOKEN'),basicId=Deno.env.get('LINE_OFFICIAL_BASIC_ID');
@@ -41,11 +41,16 @@ export async function handleLineIntake(payload:any,db:any,actor:string){
  const content=await intakeMessage(db,id);
  const {data:existing,error:readError}=await db.from('line_intake_deliveries').select('status,display_name,created_at,note,error_code').eq('enrollment_id',id).maybeSingle();
  if(readError)fail('無法讀取 LINE 發送紀錄',503);
- if(payload.action==='line_intake_status')return {configured:Boolean(Deno.env.get('LINE_CHANNEL_ACCESS_TOKEN')),delivery:existing};
+ const {data:binding,error:bindingError}=await db.from('course_line_bindings').select('line_user_id,verified_email,students(email)').eq('student_id',content.studentId).maybeSingle();
+ if(bindingError)fail('無法讀取學員 LINE 綁定',503);
+ const bound=binding&&binding.verified_email===binding.students?.email?binding:null;
+ if(payload.action==='line_intake_status')return {bound:Boolean(bound),configured:Boolean(Deno.env.get('LINE_CHANNEL_ACCESS_TOKEN')),delivery:existing};
  if(existing) return {blocked:true,delivery:existing,message:'此學員已有發送或預約紀錄，請先核對，系統不會重複發送。'};
- const userId=parseLineRecipient(String(payload.recipient||''));
+ if(payload.bound===true&&!bound)fail('學員已解除綁定，請重新確認',409);
+ const userId=bound?bound.line_user_id:parseLineRecipient(String(payload.recipient||''));
+ if(bound&&payload.recipient&&payload.recipient!==bound.line_user_id)fail('收件人與學員綁定不符',409);
  const identity=await lineIdentity(userId);
- if(payload.action==='preview_line_intake')return {...content,userId,displayName:identity.displayName,officialName:identity.officialName};
+ if(payload.action==='preview_line_intake')return {...content,bound:Boolean(bound),userId,displayName:identity.displayName,officialName:identity.officialName};
  if(payload.action!=='send_line_intake'||payload.confirmed!==true)fail('請先預覽並確認收件人');
  if(payload.messageHash!==content.hash||payload.displayName!==identity.displayName)fail('資料已變動，請重新預覽確認',409);
  const operationId=crypto.randomUUID();

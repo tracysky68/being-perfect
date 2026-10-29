@@ -30,3 +30,6 @@ verify_jwt = false
 [functions.payuni-uop-notify]
 [functions.teacher-overview]
 verify_jwt = false
+
+[functions.course-account-link]
+verify_jwt = false
