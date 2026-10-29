@@ -1,4 +1,4 @@
-import { setupReminders } from "./admin-reminders.js?v=20261030";
+import { setupReminders } from "./admin-reminders.js?v=20261030-style2";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const config = window.BP_CONFIG;
