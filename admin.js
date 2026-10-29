@@ -16,6 +16,7 @@ const passwordForm = document.querySelector("#password-form");
 let records = [];
 let cohorts = [];
 let trainingSettings = [];
+let monthlyRevenue = null;
 const completedIntake = r => Boolean(r.intake || r.trainingIntake);
 function scopedRecords(){const code=document.querySelector("#course-filter").value;return records.filter(r=>!code||r.courseCode===code);}
 const overviewOrigin = "https://being-perfect-core-workbench.onrender.com";
@@ -66,6 +67,7 @@ async function loadData() {
   if (response.status === 401 || response.status === 403) { await supabase.auth.signOut(); showLogin("這個帳號沒有管理權限。"); return; }
   const result = await response.json();
   if (!response.ok) throw new Error(result.message || "後台資料載入失敗");
+  monthlyRevenue = Array.isArray(result.monthlyRevenue) ? result.monthlyRevenue : null;
   records = result.records; cohorts = result.cohorts || []; trainingSettings = result.trainingSettings || [];
   updateMetrics(); populateCohorts(); renderRows();
   document.querySelector("#last-updated").textContent = `更新：${dateTime(new Date())}`;
@@ -81,11 +83,7 @@ function updateMetrics() {
   document.querySelector("#metric-paid").textContent = scopedRecords().filter(r=>["paid","partially_paid"].includes(r.status)).length;
   document.querySelector("#metric-intake").textContent = scopedRecords().filter(completedIntake).length;
   document.querySelector("#metric-action").textContent = scopedRecords().filter(r=>["payment_failed","refunding"].includes(r.status)||r.emailStatus==="failed").length;
-  const expected = scopedRecords().reduce((sum, r) => sum + Number(r.expectedAmountTwd ?? r.amountTwd ?? 0), 0);
-  const received = scopedRecords().reduce((sum, r) => sum + Number(r.paidAmountTwd ?? 0), 0);
-  document.querySelector("#revenue-received").textContent = money(received);
-  document.querySelector("#revenue-outstanding").textContent = money(Math.max(expected - received, 0));
-  document.querySelector("#revenue-expected").textContent = money(expected);
+  renderRevenue();
 }
 
 function populateCohorts() {
@@ -353,4 +351,43 @@ paymentLinkForm.addEventListener('submit',async event=>{
  const response=await fetch(config.adminEndpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({...Object.fromEntries(new FormData(paymentLinkForm)),action:'save_training_payment_link',active:paymentLinkForm.elements.active.checked})});
  const result=await response.json();if(!response.ok)throw new Error(result.message||'儲存失敗');await loadData();status.textContent='付款連結已儲存；交易查核與報名狀態不會因開啟連結而變更。';
  }catch(e){status.textContent=e.message;}finally{button.disabled=false;}
+});
+
+function renderRevenue(){
+ const model=window.BP_REVENUE,current=model.month(),code=document.querySelector('#course-filter').value;
+ document.querySelector('#revenue-month-title').textContent=`${current.replace('-',' 年 ')} 月營業額`;
+ if(monthlyRevenue===null){
+  ['#revenue-received','#revenue-transactions','#revenue-previous'].forEach(id=>document.querySelector(id).textContent='暫無資料');
+  document.querySelector('#revenue-orders').textContent='';document.querySelector('#revenue-change').textContent='';
+  document.querySelector('#revenue-note').textContent='月份統計尚未載入，請重新整理；此狀態不代表營業額為 0。';document.querySelector('#revenue-history-button').disabled=true;return;
+ }
+ document.querySelector('#revenue-history-button').disabled=false;
+ const rows=model.rows(monthlyRevenue,code,'',current),zero={received:0,transactions:0,orders:0};
+ const now=rows.find(r=>r.month===current)||zero,prev=rows.find(r=>r.month===model.previous(current))||zero;
+ document.querySelector('#revenue-received').textContent=money(now.received);
+ document.querySelector('#revenue-transactions').textContent=now.transactions+' 筆';
+ document.querySelector('#revenue-orders').textContent=`${now.orders} 筆報名有收款`;
+ document.querySelector('#revenue-previous').textContent=money(prev.received);
+ const change=prev.received?`${now.received>=prev.received?'+':''}${((now.received-prev.received)/prev.received*100).toFixed(1)}%`:'上月為 0，不計百分比';
+ document.querySelector('#revenue-change').textContent=`${change}（當月累計）`;
+ document.querySelector('#revenue-note').textContent=(now.transactions?'':'當月尚無已確認收款。')+'僅統計系統已確認的款項，不等於銀行撥款或扣除手續費、退款後的淨收入。未登記的 PAYUNi 款項不會自動出現。'+(rows.some(r=>r.estimated)?' 部分舊紀錄缺少確認日期，暫以通知／建檔日期歸月。':'');
+}
+function revenueHistoryRows(){return window.BP_REVENUE.rows(monthlyRevenue||[],document.querySelector('#revenue-course').value,document.querySelector('#revenue-year').value);}
+function renderRevenueHistory(){
+ const rows=revenueHistoryRows(),total=rows.reduce((s,r)=>s+r.received,0),count=rows.reduce((s,r)=>s+r.transactions,0),peak=Math.max(0,...rows.map(r=>r.received));
+ document.querySelector('#revenue-history-scope').textContent=document.querySelector('#revenue-course').selectedOptions[0].textContent;
+ document.querySelector('#revenue-statistics').innerHTML=`<article>所選期間收款合計<strong>${money(total)}</strong></article><article>平均每月收款<strong>${money(rows.length?Math.round(total/rows.length):0)}</strong><small>含零收款月與未結束的當月</small></article><article>收款筆數<strong>${count} 筆</strong></article><article>最高收款月份<strong>${peak?rows.filter(r=>r.received===peak).map(r=>r.month).join('、'):'尚無收款'}</strong><small>${money(peak)}</small></article>`;
+ document.querySelector('#revenue-months').innerHTML=rows.map(r=>`<tr><td>${escapeHtml(r.month)}${r.month===window.BP_REVENUE.month()?'（本月）':''}</td><td>${money(r.received)}</td><td>${r.transactions}</td><td>${r.orders}</td><td><div class="revenue-bar" aria-label="${escapeHtml(r.month)} ${money(r.received)}"><span style="width:${peak?r.received/peak*100:0}%"></span></div></td></tr>`).join('');
+}
+document.querySelector('#revenue-history-button').addEventListener('click',()=>{
+ const current=window.BP_REVENUE.month().slice(0,4),years=[...new Set([current,...(monthlyRevenue||[]).map(r=>r.month.slice(0,4))])].sort().reverse();
+ document.querySelector('#revenue-year').innerHTML='<option value="">全部年份</option>'+years.map(y=>`<option value="${y}">${y} 年</option>`).join('');
+ document.querySelector('#revenue-year').value=current;document.querySelector('#revenue-course').value=document.querySelector('#course-filter').value;
+ renderRevenueHistory();document.querySelector('#revenue-history-dialog').showModal();
+});
+document.querySelector('#revenue-history-close').addEventListener('click',()=>document.querySelector('#revenue-history-dialog').close());
+document.querySelectorAll('#revenue-course,#revenue-year').forEach(e=>e.addEventListener('change',renderRevenueHistory));
+document.querySelector('#revenue-export').addEventListener('click',()=>{
+ const csv='\uFEFF'+[['月份','已確認收款TWD','收款筆數','付款報名數'],...revenueHistoryRows().map(r=>[r.month,r.received,r.transactions,r.orders])].map(r=>r.join(',')).join('\r\n');
+ const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');a.href=url;a.download=`營業額-${document.querySelector('#revenue-course').value||'合併'}-${document.querySelector('#revenue-year').value||'歷年'}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });

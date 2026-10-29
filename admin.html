@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="admin.css?v=20261024-hidden-state">
     <link rel="stylesheet" href="admin-manual.css">
     <link rel="stylesheet" href="admin-password.css?v=580c70a">
-  <link rel="stylesheet" href="admin-training.css">
+  <link rel="stylesheet" href="admin-training.css?v=20261029-monthly">
   </head>
   <body>
     <main id="login-view" class="login-shell">
@@ -43,6 +43,13 @@
         <div><p class="kicker">Teacher Program / Operations</p><h1>課程管理<br><em>學員總覽</em></h1></div>
         <p>付款、寄信、選課與課前資料集中在同一個畫面。點選學員即可查看完整內容。</p>
       </section>
+      <section class="revenue-panel" aria-label="當月營業額">
+        <div class="revenue-heading"><p class="kicker">Monthly Revenue</p><h2 id="revenue-month-title">當月營業額</h2><p id="revenue-scope" aria-live="polite">兩門課程合併</p><button id="revenue-history-button" type="button">查看歷月營業額 ↗</button></div>
+        <article class="revenue-total"><span>當月已確認收款</span><strong id="revenue-received">—</strong><small>依付款確認月份計算（台灣時間）</small></article>
+        <article><span>當月收款筆數</span><strong id="revenue-transactions">—</strong><small id="revenue-orders">—</small></article>
+        <article><span>上月已確認收款</span><strong id="revenue-previous">—</strong><small id="revenue-change">—</small></article>
+      </section>
+      <p class="revenue-note" id="revenue-note">僅統計系統已確認的收款；不含待付款，不等於銀行撥款或扣除手續費、退款後的淨收入。</p>
       <section class="program-entries" aria-label="兩門課程共用管理入口">
         <article><p class="kicker">01 · 內心畫</p><h2>內心畫教師專班</h2><p>獨立報名、梯次與課前資料</p><button data-course-scope="TEACHER-DIALOGUE" aria-pressed="false">查看報名與營業額</button><a href="register.html?course=TEACHER-DIALOGUE" target="_blank" rel="noopener">學員報名頁 ↗</a></article>
         <article><p class="kicker">02 · 創感力</p><h2>創感力師資培訓</h2><p>12/20～22 · 10:00～17:00 · NT$39,800</p><button data-course-scope="TEACHER-TRAINING" aria-pressed="false">查看報名與營業額</button><a href="training-payment.html" target="_blank" rel="noopener">學員報名付款頁 ↗</a></article>
@@ -54,12 +61,6 @@
         <article class="sun"><span>已付款</span><strong id="metric-paid">—</strong><small>含分期付款</small></article>
         <article class="mint"><span>課前資料完成</span><strong id="metric-intake">—</strong><small>可供講師查看</small></article>
         <article class="coral"><span>待處理</span><strong id="metric-action">—</strong><small>付款或寄信異常</small></article>
-      </section>
-      <section class="revenue-panel" aria-label="營業額分析">
-        <div class="revenue-heading"><p class="kicker">Revenue Overview</p><h2>營業額分析</h2><p id="revenue-scope" aria-live="polite">兩門課程合併</p><small>依後台已確認的付款紀錄與每筆報名總額計算</small></div>
-        <article><span>目前已入帳</span><strong id="revenue-received">—</strong><small>已驗證／人工登記款項</small></article>
-        <article><span>尚未入帳</span><strong id="revenue-outstanding">—</strong><small>分期後續待收款</small></article>
-        <article class="revenue-total"><span>全數入帳預估</span><strong id="revenue-expected">—</strong><small>依所選課程的有效報名</small></article>
       </section>
       <section class="workbench">
         <div class="toolbar">
@@ -79,6 +80,15 @@
       </section>
     </div>
 
+    <dialog id="revenue-history-dialog" class="manual-dialog revenue-dialog">
+      <button id="revenue-history-close" type="button" class="dialog-close" aria-label="關閉歷月營業額">×</button>
+      <h2>歷月營業額統計</h2><p id="revenue-history-scope"></p>
+      <div class="revenue-controls"><label>課程<select id="revenue-course"><option value="">兩門課程合併</option><option value="TEACHER-DIALOGUE">內心畫教師專班</option><option value="TEACHER-TRAINING">創感力師資培訓</option></select></label><label>年份<select id="revenue-year"></select></label><button id="revenue-export" type="button">匯出每月統計 CSV</button></div>
+      <div class="revenue-statistics" id="revenue-statistics"></div>
+      <p>依付款確認月份計算，分次收款分別列入各次確認的月份；無收款月份顯示 0。當月尚未結束，與完整月份比較時請留意。</p>
+      <div class="table-wrap"><table><thead><tr><th>月份</th><th>已確認收款</th><th>收款筆數</th><th>付款報名數</th><th>收款趨勢</th></tr></thead><tbody id="revenue-months"></tbody></table></div>
+      <p>此為已確認收款統計，不等於銀行撥款或扣除手續費、退款後的淨收入；未登記的 PAYUNi 款項尚不會出現在這裡。</p>
+    </dialog>
     <dialog id="training-setup-dialog" class="manual-dialog">
       <button type="button" id="training-setup-close" class="dialog-close" aria-label="關閉">×</button>
       <div class="manual-head"><h2>師資班梯次設定</h2><p>先儲存草稿，確認日期、費用與課程說明後再開放報名。已有報名的梯次不在此修改。</p></div>
@@ -131,6 +141,6 @@
         <button class="manual-submit" type="submit">儲存新密碼 <span>→</span></button>
       </form>
     </dialog>
-    <script src="config.js"></script><script src="training-questionnaire.js?v=20261029-birthday"></script><script type="module" src="admin.js?v=20261029-shared-entry"></script>
+    <script src="config.js"></script><script src="revenue.js?v=20261029-monthly"></script><script src="training-questionnaire.js?v=20261029-birthday"></script><script type="module" src="admin.js?v=20261029-monthly"></script>
   </body>
 </html>
