@@ -28,7 +28,7 @@ async function notifyStudent(db:ReturnType<typeof createClient>, id:string) {
 export async function handleUop(request:Request) {
  if(request.method!=='POST')return new Response('Method Not Allowed',{status:405});
  if(Deno.env.get('PAYUNI_UOP_ENABLED')!=='true')return new Response('Not configured',{status:503});
- const key=Deno.env.get('PAYUNI_HASH_KEY'),iv=Deno.env.get('PAYUNI_HASH_IV'),merchant=Deno.env.get('PAYUNI_MERCHANT_ID'),linkName=Deno.env.get('PAYUNI_UOP_LINK_NAME');
+ const key=Deno.env.get('PAYUNI_UOP_HASH_KEY'),iv=Deno.env.get('PAYUNI_UOP_HASH_IV'),merchant=Deno.env.get('PAYUNI_UOP_MERCHANT_ID'),linkName=Deno.env.get('PAYUNI_UOP_LINK_NAME');
  if(!key||!iv||!merchant||!linkName)return new Response('Configuration required',{status:503});
  let input:Record<string,unknown>,details:Record<string,string>;
  try {
