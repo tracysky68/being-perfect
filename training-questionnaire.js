@@ -18,6 +18,15 @@ window.TRAINING_QUESTIONNAIRE = [
     "maxLength": 120
   },
   {
+    "key": "birthDate",
+    "label": "出生年月日",
+    "type": "date",
+    "required": false,
+    "options": [],
+    "max": 0,
+    "maxLength": 10
+  },
+  {
     "key": "phone",
     "label": "手機號碼",
     "type": "tel",

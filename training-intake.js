@@ -2,6 +2,8 @@ const token = new URLSearchParams(location.search).get('token') || '';
 const form = document.querySelector('#training-intake');
 const status = document.querySelector('#intake-status');
 const schema = window.TRAINING_QUESTIONNAIRE;
+const taipeiToday = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+form.elements.birthDate.max=taipeiToday;
 function updateExperience(){
   const none=form.elements.experience.value==='尚未有經驗';
   form.querySelectorAll('[data-experienced-only]').forEach(group=>{
@@ -19,6 +21,11 @@ function validateAnswers(answers){
     const v=answers[f.key];
     if(f.type==='multi'&&(!v.length||v.length>f.max))return {field:f.key,message:`「${f.label}」請選擇 1～${f.max} 項。`};
     if(f.type!=='multi'&&f.required&&!v)return {field:f.key,message:`請填寫「${f.label}」。`};
+  }
+  if(answers.birthDate){
+    const date=new Date(answers.birthDate+'T00:00:00Z');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(answers.birthDate)||!Number.isFinite(date.getTime())||date.toISOString().slice(0,10)!==answers.birthDate||answers.birthDate>taipeiToday)
+      return {field:'birthDate',message:'請填寫有效的出生年月日，不能晚於今天。'};
   }
   if(!/^\+?\d{8,15}$/.test(answers.phone.replace(/[\s-]/g,'')))return {field:'phone',message:'請確認手機號碼格式。'};
   return null;
