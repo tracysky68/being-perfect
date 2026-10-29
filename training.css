@@ -1,0 +1,29 @@
+/* Training-specific layout only; brand, typography and forms use styles.css. */
+[hidden]{display:none!important}
+.training-schedule{margin:0;padding-left:24px;display:grid;gap:14px}
+.training-schedule li{padding:8px 0;font-weight:900}
+.training-schedule span{display:block;margin-top:4px;font-size:.9rem;font-weight:500;color:#746a61;overflow-wrap:anywhere}
+.training-schedule-details{padding:18px;border:var(--line);border-radius:var(--radius)}
+.training-schedule-details summary{cursor:pointer;font-weight:900}
+.training-schedule-details[open] summary{margin-bottom:16px}
+#training-registration .checkout-button:disabled{cursor:not-allowed}
+#training-intake .intake-identity{max-width:100%;min-width:0;transform:none;overflow-wrap:anywhere}
+#training-registration .payment-choice:has(input:checked){border-color:var(--ink);box-shadow:5px 5px 0 var(--sun);background:#fff}
+#training-registration .fixed-price-card{flex-wrap:wrap}
+#intake-status:empty{display:none}
+
+/* Lighter course summary, scoped to the training registration page. */
+body[data-page="register"] .course-ticket {
+  background: var(--soft-paper);
+  color: var(--ink);
+  border: var(--line);
+}
+body[data-page="register"] .course-ticket > span { color: var(--green); }
+body[data-page="register"] .course-ticket dt { color: #746a61; }
+body[data-page="register"] .course-ticket::after { color: rgba(8, 8, 8, .045); }
+
+/* Keep visually hidden checkbox controls inside their choice chips. */
+#training-intake .chip-options label { position: relative; min-width: 0; }
+#training-intake .chip-options input { width: 1px; height: 1px; min-height: 0; inset: 0; }
+#training-intake .chip-options input:focus-visible + span { outline: 3px solid var(--green); outline-offset: 3px; }
+#training-intake fieldset { min-width: 0; }

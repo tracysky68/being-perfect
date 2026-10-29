@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="admin.css?v=20261024-hidden-state">
     <link rel="stylesheet" href="admin-manual.css">
     <link rel="stylesheet" href="admin-password.css?v=580c70a">
+  <link rel="stylesheet" href="admin-training.css">
   </head>
   <body>
     <main id="login-view" class="login-shell">
@@ -39,9 +40,15 @@
         <div class="header-actions"><span id="last-updated"></span><button id="manual-add-button" class="primary-action">＋ 人工新增已付款學員</button><button id="refresh-button">重新整理</button><button id="change-password-button">更換密碼</button><button id="logout-button" class="quiet">登出</button></div>
       </header>
       <section class="dashboard-intro">
-        <div><p class="kicker">Teacher Program / Operations</p><h1>教師專班<br><em>學員總覽</em></h1></div>
+        <div><p class="kicker">Teacher Program / Operations</p><h1>課程管理<br><em>學員總覽</em></h1></div>
         <p>付款、寄信、選課與課前資料集中在同一個畫面。點選學員即可查看完整內容。</p>
       </section>
+      <section class="program-entries" aria-label="兩門課程共用管理入口">
+        <article><p class="kicker">01 · 內心畫</p><h2>內心畫教師專班</h2><p>獨立報名、梯次與課前資料</p><button data-course-scope="TEACHER-DIALOGUE" aria-pressed="false">查看報名與營業額</button><a href="register.html?course=TEACHER-DIALOGUE" target="_blank" rel="noopener">學員報名頁 ↗</a></article>
+        <article><p class="kicker">02 · 創感力</p><h2>創感力師資培訓</h2><p>12/20～22 · 10:00～17:00 · NT$39,800</p><button data-course-scope="TEACHER-TRAINING" aria-pressed="false">查看報名與營業額</button><a href="training-payment.html" target="_blank" rel="noopener">學員報名付款頁 ↗</a></article>
+      </section>
+      <button class="all-programs" data-course-scope="" aria-pressed="true">兩門課程合併總覽</button>
+      <section class="course-switch" aria-label="選擇課程"><label>管理課程 <select id="course-filter"><option value="">全部課程</option><option value="TEACHER-DIALOGUE">內心畫教師專班</option><option value="TEACHER-TRAINING">創感力師資培訓</option></select></label><button id="payment-link-button">PAYUNi 付款連結</button><button id="training-setup-button">設定師資班梯次與費用</button><a href="training-register.html" target="_blank" rel="noopener">查看創感力課程資訊 ↗</a></section>
       <section class="metrics" aria-label="統計摘要">
         <article><span>總報名</span><strong id="metric-total">—</strong><small>所有訂單</small></article>
         <article class="sun"><span>已付款</span><strong id="metric-paid">—</strong><small>含分期付款</small></article>
@@ -49,16 +56,16 @@
         <article class="coral"><span>待處理</span><strong id="metric-action">—</strong><small>付款或寄信異常</small></article>
       </section>
       <section class="revenue-panel" aria-label="營業額分析">
-        <div class="revenue-heading"><p class="kicker">Revenue Overview</p><h2>營業額分析</h2><small>依後台已確認的付款紀錄與每筆報名總額計算</small></div>
+        <div class="revenue-heading"><p class="kicker">Revenue Overview</p><h2>營業額分析</h2><p id="revenue-scope" aria-live="polite">兩門課程合併</p><small>依後台已確認的付款紀錄與每筆報名總額計算</small></div>
         <article><span>目前已入帳</span><strong id="revenue-received">—</strong><small>已驗證／人工登記款項</small></article>
         <article><span>尚未入帳</span><strong id="revenue-outstanding">—</strong><small>分期後續待收款</small></article>
-        <article class="revenue-total"><span>全數入帳預估</span><strong id="revenue-expected">—</strong><small>依目前所有有效報名</small></article>
+        <article class="revenue-total"><span>全數入帳預估</span><strong id="revenue-expected">—</strong><small>依所選課程的有效報名</small></article>
       </section>
       <section class="workbench">
         <div class="toolbar">
           <label class="search-box"><span>搜尋</span><input id="search-input" type="search" placeholder="姓名、Email、訂單編號"></label>
           <label><span>梯次</span><select id="cohort-filter"><option value="">全部梯次</option></select></label>
-          <label><span>狀態</span><select id="status-filter"><option value="">全部狀態</option><option value="paid">已付款</option><option value="pending">待付款</option><option value="action">需處理</option><option value="complete">課前資料完成</option></select></label>
+          <label><span>狀態</span><select id="status-filter"><option value="">全部狀態</option><option value="paid">已付款</option><option value="pending">待付款</option><option value="action">需處理</option><option value="partial">部分付款</option><option value="missing">課前資料未填</option><option value="complete">課前資料完成</option></select></label>
           <button id="export-button" class="export">匯出目前名單 ↗</button>
         </div>
         <div id="loading-state" class="loading-state"><span></span><p>正在整理學員資料…</p></div>
@@ -72,6 +79,24 @@
       </section>
     </div>
 
+    <dialog id="training-setup-dialog" class="manual-dialog">
+      <button type="button" id="training-setup-close" class="dialog-close" aria-label="關閉">×</button>
+      <div class="manual-head"><h2>師資班梯次設定</h2><p>先儲存草稿，確認日期、費用與課程說明後再開放報名。已有報名的梯次不在此修改。</p></div>
+      <form id="training-setup-form" class="manual-form">
+        <label>編輯梯次<select id="training-edit-cohort" name="cohortId"><option value="">＋ 建立新梯次</option></select></label>
+        <button type="button" id="training-toggle-registration" hidden>變更報名狀態</button>
+        <label>梯次名稱<input name="title" required maxlength="120" placeholder="例如：師資培訓第一期"></label>
+        <label>課程說明<textarea name="description" maxlength="5000" rows="4" placeholder="課程內容、適合對象及上課方式"></textarea></label>
+        <div class="manual-grid"><label>課程總費用（元）<input name="amountTwd" type="number" min="1" step="1" required></label><label id="training-installment-label">分期期數<input name="installmentCount" type="number" value="1" min="1" max="24" step="1" required></label></div>
+        <p id="training-installment-help">填 1 代表僅提供一次付清；大於 1 時另提供等額分期，總費用須可整除。訂金與非等額尾款尚不適用。</p>
+        <div id="training-payment-methods" hidden></div>
+        <h3>整期課表（台灣時間）</h3><div id="training-session-editor"></div><button type="button" id="training-add-session">＋ 新增一堂課</button>
+        <label><input type="checkbox" name="active">開放報名（需有有效費用及至少一堂課）</label>
+        <p id="training-setup-status" role="status"></p><button type="submit" id="training-setup-save">儲存設定</button>
+      </form>
+    </dialog>
+    <dialog id="payment-link-dialog" class="manual-dialog"><button type="button" id="payment-link-close" class="dialog-close" aria-label="關閉">×</button><div class="manual-head"><h2>PAYUNi 付款連結</h2><p>填入已在 PAYUNi 建立的師資班付款連結。此設定只提供付款入口，不會自動將學員標記已付款。</p></div>
+<form id="payment-link-form" class="manual-form"><label>師資班梯次<select name="cohortId" required></select></label><label>付款方式<select name="channel"><option value="payuni_hosted">PAYUNi 綜合付款（信用卡／ATM）</option><option value="payuni_credit_installments">統一金流信用卡分期</option><option value="cardless_installments">無卡分期（PAYUNi）</option></select></label><label>PAYUNi 付款連結<input name="url" type="url" required placeholder="https://…payuni.com.tw/…" maxlength="2000"></label><label>連結所列總金額<input name="amountTwd" type="number" min="1" step="1" required></label><label class="consent"><input name="active" type="checkbox">我已確認連結中的課程與總金額正確，開放此付款入口</label><p id="payment-link-status" role="status"></p><button type="submit" class="manual-submit">儲存付款連結</button></form></dialog>
     <dialog id="student-dialog">
       <button class="dialog-close" aria-label="關閉">×</button>
       <div id="student-detail"></div>
@@ -84,6 +109,7 @@
           <label>姓名／稱呼<input name="name" required maxlength="80"></label>
           <label>Email<input name="email" type="email" required maxlength="254"></label>
           <label>手機號碼<input name="phone" type="tel" required inputmode="tel" placeholder="09xxxxxxxx"></label>
+          <label>報名課程<select name="courseCode" id="manual-course"><option value="TEACHER-DIALOGUE">內心畫教師專班</option><option value="TEACHER-TRAINING">創感力師資培訓</option></select></label>
           <label>報名梯次<select name="cohortId" id="manual-cohort"><option value="">由學員在課前表單選擇</option></select></label>
           <label>實際付款金額<input name="amountTwd" type="number" min="1" step="1" value="13800" required></label>
           <label>付款日期<input name="paidDate" type="date" required></label>
@@ -105,6 +131,6 @@
         <button class="manual-submit" type="submit">儲存新密碼 <span>→</span></button>
       </form>
     </dialog>
-    <script src="config.js"></script><script type="module" src="admin.js?v=20261012-overview-separate"></script>
+    <script src="config.js"></script><script src="training-questionnaire.js?v=20261029"></script><script type="module" src="admin.js?v=20261029-shared-entry"></script>
   </body>
 </html>

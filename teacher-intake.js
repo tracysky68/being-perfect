@@ -51,6 +51,10 @@ async function loadPortal() {
     const response = await fetch(`${window.BP_CONFIG.intakeEndpoint}?token=${encodeURIComponent(token)}`);
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || "目前無法載入資料");
+    if (result.courseCode === "TEACHER-TRAINING") {
+      location.replace(`training-intake.html?token=${encodeURIComponent(token)}`);
+      return;
+    }
     document.querySelector("[data-student-name]").textContent = `${result.student.name}，你好`;
     document.querySelector("[data-cohort-title]").textContent = result.cohortSelectionRequired ? "請在下方選擇月份" : result.cohort;
     document.querySelector("[data-intake-identity]").hidden = false;

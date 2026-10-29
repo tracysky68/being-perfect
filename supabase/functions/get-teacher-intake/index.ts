@@ -23,11 +23,21 @@ Deno.serve(async (request) => {
   const { data: portal } = await supabase.from("enrollment_portal_tokens").select("enrollment_id").eq("token", token).eq("active", true).maybeSingle();
   if (!portal) return jsonResponse({ message: "這個專屬連結無效或已停用" }, 404, cors);
 
-  const { data: enrollment } = await supabase.from("enrollments").select("id,status,student_id,cohort_id").eq("id", portal.enrollment_id).single();
+  const { data: enrollment } = await supabase.from("enrollments").select("id,status,student_id,cohort_id,contact_snapshot").eq("id", portal.enrollment_id).single();
   if (!enrollment) return jsonResponse({ message: "找不到報名資料" }, 404, cors);
   if (!["paid", "partially_paid"].includes(enrollment.status)) return jsonResponse({ message: "付款尚未確認，確認後即可填寫" }, 403, cors);
 
-  const { data: cohort } = await supabase.from("cohorts").select("title,course_id").eq("id", enrollment.cohort_id).single();
+  const { data: cohort } = await supabase.from("cohorts").select("title,course_id,courses(code,title)").eq("id", enrollment.cohort_id).single();
+  const course = Array.isArray(cohort?.courses) ? cohort.courses[0] : cohort?.courses;
+  if (course?.code === "TEACHER-TRAINING") {
+    const [{data: student,error: studentError},{data: intake,error: intakeError},{data: sessions,error: sessionError}] = await Promise.all([
+      supabase.from("students").select("full_name,email,phone").eq("id",enrollment.student_id).single(),
+      supabase.from("training_intake_responses").select("*").eq("enrollment_id",enrollment.id).maybeSingle(),
+      supabase.from("training_sessions").select("id,title,starts_at,ends_at").eq("cohort_id",enrollment.cohort_id).order("starts_at")
+    ]);
+    if (studentError || intakeError || sessionError) return jsonResponse({message:"課前資料載入失敗"},500,cors);
+    return jsonResponse({courseCode:course.code,courseTitle:course.title,cohort:cohort?.title,student:{name:enrollment.contact_snapshot?.name ?? student?.full_name,email:enrollment.contact_snapshot?.email ?? student?.email,phone:enrollment.contact_snapshot?.phone ?? student?.phone},sessions:sessions ?? [],intake},200,cors);
+  }
   const cohortSelectionRequired = cohort?.title === "待學員選擇月份";
   const { data: availableCohorts } = cohortSelectionRequired
     ? await supabase.from("cohorts").select("id,title").eq("course_id", cohort.course_id).eq("active", true).neq("title", "待學員選擇月份").order("starts_at")

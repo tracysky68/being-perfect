@@ -38,6 +38,12 @@ Deno.serve(async (request) => {
       .select("id,code,title,total_amount_twd,installment_count,installment_amount_twd,eligibility,active")
       .eq("course_id", cohort.course_id).eq("code", pricingCode).single();
     if (planError || !plan?.active) return jsonResponse({ message: "此價格方案目前無法使用" }, 409, cors);
+    if (courseCode === "TEACHER-TRAINING") {
+      const { data: setting, error: settingError } = await supabase.from("training_cohort_settings")
+        .select("cohort_id,training_sessions(id)").eq("cohort_id", cohort.id).eq("pricing_plan_id", plan.id).maybeSingle();
+      if (settingError || !setting || !setting.training_sessions?.length) return jsonResponse({ message: "此梯次的費用或課表尚未設定完成" }, 409, cors);
+    }
+    if (paymentOption === "installments" && plan.installment_count < 2) return jsonResponse({ message: "此方案僅提供一次付清" }, 422, cors);
     if (plan.eligibility !== "public") {
       const [{ data: emailMatch }, { data: phoneMatch }] = await Promise.all([
         supabase.from("eligibility_records").select("id").eq("eligibility", plan.eligibility).eq("email", email).eq("active", true).maybeSingle(),
@@ -46,10 +52,17 @@ Deno.serve(async (request) => {
       if (!emailMatch && !phoneMatch) return jsonResponse({ message: "目前查不到家長班舊生資格，請改選一般學員，或聯絡玩美學協助核對" }, 422, cors);
     }
 
+    let orderNumber: string;
+    let chargeAmount: number;
+    if (courseCode === "TEACHER-TRAINING") {
+      const {data: checkout,error: checkoutError} = await supabase.rpc("create_training_checkout", {details:{name,email,phone,cohortId,pricingCode,paymentOption,privacyConsent:payload.privacyConsent,termsConsent:payload.termsConsent}});
+      if (checkoutError) return jsonResponse({message:"報名設定已變動或資料不完整，請重新整理後再試。"},409,cors);
+      orderNumber=checkout.orderNumber;chargeAmount=checkout.chargeAmount;
+    } else {
     const { data: student, error: studentError } = await supabase.from("students").upsert({ email, full_name: name, phone, updated_at: new Date().toISOString() }, { onConflict: "email" }).select("id").single();
     if (studentError) throw studentError;
 
-    const orderNumber = `BP${Date.now()}${crypto.randomUUID().slice(0, 4)}`.replaceAll("-", "").toUpperCase();
+    orderNumber = `BP${Date.now()}${crypto.randomUUID().slice(0, 4)}`.replaceAll("-", "").toUpperCase();
     const now = new Date().toISOString();
     const invoiceType = payload.invoiceType === "company" ? "company" : "personal";
     const { data: enrollment, error: enrollmentError } = await supabase.from("enrollments").insert({
@@ -71,12 +84,14 @@ Deno.serve(async (request) => {
     if (installmentError) throw installmentError;
     const firstInstallment = installments?.find((item) => item.installment_number === 1);
     if (!firstInstallment) throw new Error("Unable to create first installment");
-    const chargeAmount = firstInstallment.amount_twd;
+    chargeAmount = firstInstallment.amount_twd;
     const { error: transactionError } = await supabase.from("payment_transactions").insert({
       enrollment_id: enrollment.id, payment_installment_id: firstInstallment.id,
       merchant_order_number: orderNumber, amount_twd: chargeAmount
     });
     if (transactionError) throw transactionError;
+
+    }
 
     const merchantId = Deno.env.get("PAYUNI_MERCHANT_ID")!;
     const hashKey = Deno.env.get("PAYUNI_HASH_KEY")!;

@@ -15,6 +15,9 @@ const passwordDialog = document.querySelector("#password-dialog");
 const passwordForm = document.querySelector("#password-form");
 let records = [];
 let cohorts = [];
+let trainingSettings = [];
+const completedIntake = r => Boolean(r.intake || r.trainingIntake);
+function scopedRecords(){const code=document.querySelector("#course-filter").value;return records.filter(r=>!code||r.courseCode===code);}
 const overviewOrigin = "https://being-perfect-core-workbench.onrender.com";
 const overviewNonce = new URLSearchParams(location.hash.slice(1)).get("overview");
 const overviewBridgeActive = /^[0-9a-f]{32}$/.test(overviewNonce ?? "") && !!window.opener;
@@ -63,19 +66,23 @@ async function loadData() {
   if (response.status === 401 || response.status === 403) { await supabase.auth.signOut(); showLogin("這個帳號沒有管理權限。"); return; }
   const result = await response.json();
   if (!response.ok) throw new Error(result.message || "後台資料載入失敗");
-  records = result.records; cohorts = result.cohorts || [];
+  records = result.records; cohorts = result.cohorts || []; trainingSettings = result.trainingSettings || [];
   updateMetrics(); populateCohorts(); renderRows();
   document.querySelector("#last-updated").textContent = `更新：${dateTime(new Date())}`;
   readTeacherOverview();
 }
 
 function updateMetrics() {
-  document.querySelector("#metric-total").textContent = records.length;
-  document.querySelector("#metric-paid").textContent = records.filter(r=>["paid","partially_paid"].includes(r.status)).length;
-  document.querySelector("#metric-intake").textContent = records.filter(r=>r.intake).length;
-  document.querySelector("#metric-action").textContent = records.filter(r=>["payment_failed","refunding"].includes(r.status)||r.emailStatus==="failed").length;
-  const expected = records.reduce((sum, r) => sum + Number(r.expectedAmountTwd ?? r.amountTwd ?? 0), 0);
-  const received = records.reduce((sum, r) => sum + Number(r.paidAmountTwd ?? 0), 0);
+  const code = document.querySelector("#course-filter").value;
+  document.querySelector("#revenue-scope").textContent = code === "TEACHER-DIALOGUE" ? "內心畫教師專班" : code === "TEACHER-TRAINING" ? "創感力師資培訓" : "兩門課程合併";
+  document.querySelectorAll("[data-course-scope]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.courseScope === code)));
+
+  document.querySelector("#metric-total").textContent = scopedRecords().length;
+  document.querySelector("#metric-paid").textContent = scopedRecords().filter(r=>["paid","partially_paid"].includes(r.status)).length;
+  document.querySelector("#metric-intake").textContent = scopedRecords().filter(completedIntake).length;
+  document.querySelector("#metric-action").textContent = scopedRecords().filter(r=>["payment_failed","refunding"].includes(r.status)||r.emailStatus==="failed").length;
+  const expected = scopedRecords().reduce((sum, r) => sum + Number(r.expectedAmountTwd ?? r.amountTwd ?? 0), 0);
+  const received = scopedRecords().reduce((sum, r) => sum + Number(r.paidAmountTwd ?? 0), 0);
   document.querySelector("#revenue-received").textContent = money(received);
   document.querySelector("#revenue-outstanding").textContent = money(Math.max(expected - received, 0));
   document.querySelector("#revenue-expected").textContent = money(expected);
@@ -84,26 +91,26 @@ function updateMetrics() {
 function populateCohorts() {
   const select = document.querySelector("#cohort-filter");
   const current = select.value;
-  select.innerHTML = '<option value="">全部梯次</option>'+[...new Set(records.map(r=>r.cohort))].sort().map(v=>`<option>${escapeHtml(v)}</option>`).join("");
-  select.value = current;
-  document.querySelector("#manual-cohort").innerHTML = '<option value="">由學員在課前表單選擇</option>'+cohorts.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.title)}</option>`).join("");
+  select.innerHTML = '<option value="">全部梯次</option>'+[...new Set(scopedRecords().map(r=>r.cohort))].sort().map(v=>`<option>${escapeHtml(v)}</option>`).join("");
+  select.value = [...select.options].some(o=>o.value===current)?current:"";
+  populateManualCohorts();
 }
 
 function filteredRecords() {
   const query = document.querySelector("#search-input").value.trim().toLowerCase();
   const cohort = document.querySelector("#cohort-filter").value;
   const status = document.querySelector("#status-filter").value;
-  return records.filter((r) => {
+  return scopedRecords().filter((r) => {
     const matchesQuery = !query || [r.name,r.email,r.phone,r.orderNumber].some(v=>String(v).toLowerCase().includes(query));
     const matchesCohort = !cohort || r.cohort === cohort;
-    const matchesStatus = !status || (status === "paid" && ["paid","partially_paid"].includes(r.status)) || (status === "pending" && r.status === "pending_payment") || (status === "action" && (["payment_failed","refunding"].includes(r.status)||r.emailStatus==="failed")) || (status === "complete" && r.intake);
+    const matchesStatus = !status || (status === "paid" && ["paid","partially_paid"].includes(r.status)) || (status === "pending" && r.status === "pending_payment") || (status === "action" && (["payment_failed","refunding"].includes(r.status)||r.emailStatus==="failed")) || (status === "complete" && completedIntake(r)) || (status === "missing" && !completedIntake(r)) || (status === "partial" && r.status === "partially_paid");
     return matchesQuery && matchesCohort && matchesStatus;
   });
 }
 
 function renderRows() {
   const list = filteredRecords();
-  tbody.innerHTML = list.map((r)=>`<tr data-id="${r.id}"><td><div class="person"><b>${escapeHtml(r.name)}</b><span>${escapeHtml(r.email)}</span><span>${escapeHtml(r.phone)}</span></div></td><td><b>${escapeHtml(r.cohort)}</b><div class="subtle">${r.sessions.map(s=>escapeHtml(s.title)).join("、")||"尚未選擇日期"}</div></td><td>${paymentBadge(r)}<div class="subtle">${money(r.amountTwd)} · ${escapeHtml(r.paymentOptionLabel)}</div></td><td>${r.intake?badge("已完成","good"):badge("待填寫","warn")}</td><td>${r.emailStatus==="sent"?badge("已寄送","good"):r.emailStatus==="failed"?badge("寄送失敗","bad"):badge("尚未寄送")}</td><td class="row-arrow">→</td></tr>`).join("");
+  tbody.innerHTML = list.map((r)=>`<tr data-id="${r.id}"><td><div class="person"><b>${escapeHtml(r.name)}</b><span>${escapeHtml(r.email)}</span><span>${escapeHtml(r.phone)}</span></div></td><td><div class="subtle">${escapeHtml(r.courseTitle)}</div><b>${escapeHtml(r.cohort)}</b><div class="subtle">${(r.courseCode==="TEACHER-TRAINING"?r.trainingSessions:r.sessions).map(s=>escapeHtml(s.title)).join("、")||"尚未安排日期"}</div></td><td>${paymentBadge(r)}<div class="subtle">${money(r.amountTwd)} · ${escapeHtml(r.paymentOptionLabel)}</div></td><td>${completedIntake(r)?badge("已完成","good"):badge("待填寫","warn")}</td><td>${r.emailStatus==="sent"?badge("已寄送","good"):r.emailStatus==="failed"?badge("寄送失敗","bad"):badge("尚未寄送")}</td><td class="row-arrow">→</td></tr>`).join("");
   document.querySelector("#loading-state").hidden = true;
   document.querySelector("#empty-state").hidden = list.length > 0;
   table.hidden = list.length === 0;
@@ -114,6 +121,21 @@ function openDetail(id) {
   const r = records.find(item=>item.id===id); if(!r)return;
   const intake = r.intake;
   document.querySelector("#student-detail").innerHTML = `<div class="detail-head"><span class="section-no">STUDENT FILE</span><h2>${escapeHtml(r.name)}</h2><p>${escapeHtml(r.cohort)} · ${escapeHtml(r.orderNumber)}</p></div><div class="detail-grid"><section class="detail-section"><h3>聯絡與付款</h3><dl><dt>Email</dt><dd>${escapeHtml(r.email)}</dd><dt>手機</dt><dd>${escapeHtml(r.phone)}</dd><dt>付款狀態</dt><dd>${paymentBadge(r)} ${money(r.amountTwd)}</dd><dt>付款時間</dt><dd>${dateTime(r.paidAt)}</dd><dt>確認信</dt><dd>${escapeHtml(r.emailStatusLabel)}</dd></dl></section><section class="detail-section"><h3>上課日期</h3><dl>${r.sessions.map(s=>`<dt>${s.module==="day_1"?"第一天":"第二天"}</dt><dd>${escapeHtml(s.title)}<br>${dateTime(s.startsAt)}</dd>`).join("")||"尚未選擇"}</dl></section>${intake?`<section class="detail-section"><h3>教學背景</h3><dl><dt>目前身分</dt><dd>${escapeHtml(intake.currentRole)}</dd><dt>單位</dt><dd>${escapeHtml(intake.organization)||"—"}</dd><dt>年資</dt><dd>${escapeHtml(intake.teachingYears)}</dd><dt>學生年齡</dt><dd>${tags(intake.studentAgeGroups)}</dd><dt>藝術背景</dt><dd>${escapeHtml(intake.artBackground)}</dd><dt>教育背景</dt><dd>${escapeHtml(intake.educationBackground)}</dd></dl></section><section class="detail-section"><h3>教學需求</h3><dl><dt>主要挑戰</dt><dd>${tags(intake.mainChallenges)}</dd><dt>最想釐清</dt><dd>${escapeHtml(intake.focusQuestions)}</dd><dt>學習期待</dt><dd>${escapeHtml(intake.learningExpectations)}</dd></dl></section><section class="detail-section wide"><h3>補充資料</h3><dl><dt>案例描述</dt><dd>${escapeHtml(intake.caseDescription)||"—"}</dd><dt>其他備註</dt><dd>${escapeHtml(intake.additionalNotes)||"—"}</dd><dt>作品使用同意</dt><dd>${intake.artworkPermission?"同意":"不同意"}</dd><dt>提交時間</dt><dd>${dateTime(intake.submittedAt)}</dd></dl></section>`:`<section class="detail-section wide"><h3>課前資料</h3><p>學員尚未完成填寫。</p></section>`}</div>`;
+  if (r.trainingIntake) {
+    const fields = {role_title:"目前職業／身分",organization:"任職單位",teaching_experience:"教學經驗",motivation:"參訓動機",intended_use:"培訓後運用",learning_expectations:"學習期待",additional_notes:"補充說明"};
+    const section = document.querySelector("#student-detail .detail-section.wide");
+    section.innerHTML = `<h3>師資培訓課前調查</h3><dl>${Object.entries(fields).map(([key,label])=>`<dt>${label}</dt><dd>${escapeHtml(r.trainingIntake[key])||"—"}</dd>`).join("")}<dt>提交時間</dt><dd>${dateTime(r.trainingIntake.submitted_at)}</dd></dl>`;
+  }
+  if(r.trainingIntake?.questionnaire){
+    const answers=r.trainingIntake.questionnaire;
+    const section=document.querySelector("#student-detail .detail-section.wide");
+    section.innerHTML=`<h3>師資培訓課前問卷</h3><dl>${window.TRAINING_QUESTIONNAIRE.map(f=>`<dt>${escapeHtml(f.label)}</dt><dd>${escapeHtml(Array.isArray(answers[f.key])?answers[f.key].join('、'):answers[f.key])||'—'}</dd>`).join('')}<dt>資料使用說明同意時間</dt><dd>${dateTime(r.trainingIntake.consent_at)}</dd><dt>提交時間</dt><dd>${dateTime(r.trainingIntake.submitted_at)}</dd></dl>`;
+  }
+  if (r.courseCode === "TEACHER-TRAINING") {
+    document.querySelectorAll("#student-detail .detail-section")[1].innerHTML=`<h3>整期課表</h3><dl>${r.trainingSessions.slice().sort((a,b)=>a.starts_at.localeCompare(b.starts_at)).map(s=>`<dt>${escapeHtml(s.title)}</dt><dd>${dateTime(s.starts_at)} ～ ${dateTime(s.ends_at)}</dd>`).join("")||"尚未安排"}</dl>`;
+  }
+  const history = records.filter(item=>item.studentId===r.studentId);
+  document.querySelector("#student-detail").insertAdjacentHTML("beforeend",`<section class="detail-section"><h3>這位學員的報名紀錄</h3><p class="subtle">依目前載入的報名紀錄顯示</p><ul>${history.map(item=>`<li>${escapeHtml(item.courseTitle)} · ${escapeHtml(item.cohort)} · ${paymentBadge(item)}</li>`).join("")}</ul></section>`);
   if (["paid", "partially_paid"].includes(r.status)) {
     document.querySelector("#student-detail .detail-section").insertAdjacentHTML("beforeend", `<div class="detail-email-action"><button type="button" data-resend-intake>補寄課前表單</button><p data-resend-status class="form-status" role="status"></p></div>`);
     document.querySelector("[data-resend-intake]").addEventListener("click", () => resendIntakeEmail(r));
@@ -182,14 +204,16 @@ async function resendIntakeEmail(record) {
 }
 
 function exportCsv() {
-  const rows = filteredRecords().map(r=>[r.name,r.email,r.phone,r.cohort,r.status,r.amountTwd,r.sessions.map(s=>s.title).join(" / "),r.intake?"已完成":"待填寫",r.emailStatusLabel]);
-  const csv = [["姓名","Email","手機","梯次","付款狀態","金額","上課場次","課前資料","寄信狀態"],...rows].map(row=>row.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n");
+  const rows = filteredRecords().map(r=>[r.name,r.email,r.phone,r.courseTitle,r.cohort,r.status,r.amountTwd,(r.courseCode==="TEACHER-TRAINING"?r.trainingSessions:r.sessions).map(s=>s.title).join(" / "),completedIntake(r)?"已完成":"待填寫",r.emailStatusLabel]);
+  const csv = [["姓名","Email","手機","課程","梯次","付款狀態","金額","上課場次","課前資料","寄信狀態"],...rows].map(row=>row.map(v=>`"${String(v??"").replace(/^[=+@\-\t\r]/, "' $&").replaceAll('"','""')}"`).join(",")).join("\n");
   const link = document.createElement("a"); link.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"})); link.download=`玩美學學員名單-${new Date().toISOString().slice(0,10)}.csv`; link.click(); URL.revokeObjectURL(link.href);
 }
 
 function openManualForm() {
   manualForm.reset();
-  manualForm.elements.amountTwd.value = "13800";
+  manualForm.elements.courseCode.value = document.querySelector("#course-filter").value || "TEACHER-DIALOGUE";
+  populateManualCohorts();
+  manualForm.elements.amountTwd.value = manualForm.elements.courseCode.value === "TEACHER-TRAINING" ? "" : "13800";
   manualForm.elements.paidDate.value = new Date().toLocaleDateString("en-CA", {timeZone:"Asia/Taipei"});
   document.querySelector("#manual-status").textContent = "";
   document.querySelector("#manual-submit").disabled = false;
@@ -224,5 +248,109 @@ document.querySelector(".password-close").addEventListener("click",()=>passwordD
 passwordForm.addEventListener("submit",async(e)=>{e.preventDefault();const data=new FormData(passwordForm);const password=String(data.get("newPassword"));const confirm=String(data.get("confirmPassword"));const status=document.querySelector("#password-status");if(password!==confirm){status.textContent="兩次輸入的密碼不一致。";return;}status.textContent="正在儲存…";const {error}=await supabase.auth.updateUser({password});if(error){status.textContent=`儲存失敗：${error.message}`;return;}status.textContent="密碼已更新完成。";setTimeout(()=>passwordDialog.close(),1000);});
 document.querySelector("#logout-button").addEventListener("click",async()=>{++overviewRun;sendOverview("wan-teacher-disconnected",null);await supabase.auth.signOut();showLogin("已安全登出。");});
 document.querySelector("#manual-add-button").addEventListener("click",openManualForm);document.querySelector(".manual-close").addEventListener("click",()=>manualDialog.close());
-document.querySelector("#refresh-button").addEventListener("click",loadData);document.querySelector("#export-button").addEventListener("click",exportCsv);document.querySelectorAll("#search-input,#cohort-filter,#status-filter").forEach(el=>el.addEventListener(el.tagName==="INPUT"?"input":"change",renderRows));document.querySelector(".dialog-close").addEventListener("click",()=>dialog.close());dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close();});
+document.querySelector("#refresh-button").addEventListener("click",loadData);document.querySelector("#export-button").addEventListener("click",exportCsv);document.querySelectorAll("#search-input,#cohort-filter,#status-filter").forEach(el=>el.addEventListener(el.tagName==="INPUT"?"input":"change",renderRows));document.querySelector("#student-dialog .dialog-close").addEventListener("click",()=>dialog.close());dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close();});
 const {data:{session}}=await supabase.auth.getSession();session?showDashboard():showLogin();supabase.auth.onAuthStateChange((_event,next)=>{if(next&&dashboardView.hidden)showDashboard();});
+
+function populateManualCohorts(){
+  const code=manualForm.elements.courseCode.value;
+  const select=manualForm.elements.cohortId;
+  select.required=code==="TEACHER-TRAINING";
+  select.innerHTML=`<option value="">${select.required?"請選擇師資培訓梯次":"由學員在課前表單選擇"}</option>`+cohorts.filter(c=>c.courses?.code===code).map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.title)}</option>`).join("");
+}
+manualForm.elements.courseCode.addEventListener("change",()=>{populateManualCohorts();manualForm.elements.amountTwd.value="";});
+document.querySelector("#course-filter").addEventListener("change",()=>{populateCohorts();updateMetrics();renderRows();});
+document.querySelectorAll("[data-course-scope]").forEach(button => button.addEventListener("click", () => {
+  document.querySelector("#course-filter").value = button.dataset.courseScope;
+  document.querySelector("#cohort-filter").value = "";
+  document.querySelector("#status-filter").value = "";
+  document.querySelector("#search-input").value = "";
+  populateCohorts(); updateMetrics(); renderRows();
+}));
+
+const setupDialog=document.querySelector("#training-setup-dialog");
+const setupForm=document.querySelector("#training-setup-form");
+function addSessionEditor(session={}){
+  const localTime=value=>value?new Date(new Date(value).getTime()+8*60*60*1000).toISOString().slice(0,16):"";
+  const row=document.createElement("div");row.className="training-session-row";
+  row.innerHTML=`<label>課堂名稱<input data-session-title required maxlength="120" value="${escapeHtml(session.title)}"></label><label>開始<input data-session-start type="datetime-local" required value="${localTime(session.starts_at)}"></label><label>結束<input data-session-end type="datetime-local" required value="${localTime(session.ends_at)}"></label><button type="button" aria-label="移除此堂課">移除</button>`;
+  row.querySelector("button").addEventListener("click",()=>row.remove());document.querySelector("#training-session-editor").append(row);
+}
+function fillSetup(){
+  const setting=trainingSettings.find(s=>s.cohort_id===setupForm.elements.cohortId.value);
+  const toggle=document.querySelector("#training-toggle-registration");
+  toggle.hidden=!setting;toggle.textContent=setting?.cohorts?.active?"暫停此梯次報名":"開放此梯次報名";
+  const configuredMethods=setting?.payment_methods;
+  document.querySelector('#training-installment-label').hidden=Boolean(configuredMethods);
+  document.querySelector('#training-installment-help').hidden=Boolean(configuredMethods);
+  const methodsPanel=document.querySelector('#training-payment-methods');methodsPanel.hidden=!configuredMethods;
+  methodsPanel.innerHTML=configuredMethods?`<h3>付款方式</h3><ul>${configuredMethods.map(m=>`<li>${escapeHtml(m.label)}：待設定</li>`).join('')}</ul><p>信用卡分期由金流及銀行處理，不使用本系統的等額分期收款。付款通路完成前請保留草稿。</p>`:'';
+  setupForm.elements.title.value=setting?.cohorts?.title||"";
+  setupForm.elements.description.value=setting?.description||"";
+  setupForm.elements.amountTwd.value=setting?.pricing_plans?.total_amount_twd||"";
+  setupForm.elements.installmentCount.value=setting?.pricing_plans?.installment_count||1;
+  setupForm.elements.active.checked=setting?.cohorts?.active===true;
+  document.querySelector("#training-session-editor").replaceChildren();
+  (setting?.training_sessions||[]).slice().sort((a,b)=>a.starts_at.localeCompare(b.starts_at)).forEach(addSessionEditor);
+  document.querySelector("#training-setup-status").textContent="";
+}
+function setupOptions(selected=""){
+  setupForm.elements.cohortId.innerHTML='<option value="">＋ 建立新梯次</option>'+trainingSettings.map(s=>`<option value="${escapeHtml(s.cohort_id)}">${escapeHtml(s.cohorts?.title)}${s.cohorts?.active?"（開放中）":"（草稿）"}</option>`).join("");
+  setupForm.elements.cohortId.value=selected;fillSetup();
+}
+document.querySelector("#training-setup-button").addEventListener("click",()=>{setupOptions();setupDialog.showModal();});
+document.querySelector("#training-setup-close").addEventListener("click",()=>setupDialog.close());
+document.querySelector("#training-add-session").addEventListener("click",()=>addSessionEditor());
+setupForm.elements.cohortId.addEventListener("change",fillSetup);
+setupForm.addEventListener("submit",async event=>{
+  event.preventDefault();if(!setupForm.reportValidity())return;
+  const button=document.querySelector("#training-setup-save");const status=document.querySelector("#training-setup-status");
+  const data=Object.fromEntries(new FormData(setupForm));
+  const sessions=[...document.querySelectorAll(".training-session-row")].map(row=>({title:row.querySelector("[data-session-title]").value.trim(),startsAt:row.querySelector("[data-session-start]").value+":00+08:00",endsAt:row.querySelector("[data-session-end]").value+":00+08:00"}));
+  if(Number(data.amountTwd)%Number(data.installmentCount)!==0){status.textContent="總費用須可整除分期期數。";return;}
+  if(sessions.some(s=>new Date(s.endsAt)<=new Date(s.startsAt))){status.textContent="每堂課的結束時間必須晚於開始時間。";return;}
+  if(setupForm.elements.active.checked&&!sessions.length){status.textContent="開放報名前請至少設定一堂課。";return;}
+  button.disabled=true;status.textContent="正在儲存…";
+  try{
+    const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("請重新登入");
+    const response=await fetch(config.adminEndpoint,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({action:"save_training_setup",settings:{...data,active:setupForm.elements.active.checked,sessions}})});
+    const result=await response.json();if(!response.ok)throw new Error(result.message||"儲存失敗");
+    await loadData();setupOptions(result.cohortId);status.textContent=setupForm.elements.active.checked?"已儲存並開放報名。":"草稿已儲存，尚未開放報名。";
+  }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+});
+
+document.querySelector("#training-toggle-registration").addEventListener("click",async()=>{
+  const setting=trainingSettings.find(s=>s.cohort_id===setupForm.elements.cohortId.value);if(!setting)return;
+  const button=document.querySelector("#training-toggle-registration");const status=document.querySelector("#training-setup-status");button.disabled=true;
+  try{
+    const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("請重新登入");
+    const response=await fetch(config.adminEndpoint,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({action:"set_training_registration",cohortId:setting.cohort_id,active:!setting.cohorts.active})});
+    const result=await response.json();if(!response.ok)throw new Error(result.message||"更新失敗");
+    await loadData();setupOptions(setting.cohort_id);status.textContent="報名狀態已更新；課表與費用保持原設定。";
+  }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+});
+
+const paymentLinkDialog=document.querySelector('#payment-link-dialog');
+const paymentLinkForm=document.querySelector('#payment-link-form');
+function fillPaymentLink(){
+ const setting=trainingSettings.find(s=>s.cohort_id===paymentLinkForm.elements.cohortId.value);
+ const link=setting?.training_payment_links?.find(l=>l.channel===paymentLinkForm.elements.channel.value);
+ paymentLinkForm.elements.url.value=link?.payment_url||'';
+ paymentLinkForm.elements.amountTwd.value=link?.amount_twd||setting?.pricing_plans?.total_amount_twd||'';
+ paymentLinkForm.elements.active.checked=link?.active===true;
+}
+document.querySelector('#payment-link-button').addEventListener('click',()=>{
+ paymentLinkForm.reset();paymentLinkForm.elements.cohortId.innerHTML=trainingSettings.map(s=>`<option value="${escapeHtml(s.cohort_id)}">${escapeHtml(s.cohorts?.title)}</option>`).join('');
+ fillPaymentLink();document.querySelector('#payment-link-status').textContent='';paymentLinkDialog.showModal();
+});
+document.querySelector('#payment-link-close').addEventListener('click',()=>paymentLinkDialog.close());
+paymentLinkForm.elements.cohortId.addEventListener('change',fillPaymentLink);
+paymentLinkForm.elements.channel.addEventListener('change',fillPaymentLink);
+paymentLinkForm.addEventListener('submit',async event=>{
+ event.preventDefault();if(!paymentLinkForm.reportValidity())return;
+ const button=paymentLinkForm.querySelector('button');const status=document.querySelector('#payment-link-status');button.disabled=true;
+ try{
+ const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error('請重新登入');
+ const response=await fetch(config.adminEndpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({...Object.fromEntries(new FormData(paymentLinkForm)),action:'save_training_payment_link',active:paymentLinkForm.elements.active.checked})});
+ const result=await response.json();if(!response.ok)throw new Error(result.message||'儲存失敗');await loadData();status.textContent='付款連結已儲存；交易查核與報名狀態不會因開啟連結而變更。';
+ }catch(e){status.textContent=e.message;}finally{button.disabled=false;}
+});

@@ -22,6 +22,20 @@ Deno.serve(async (request) => {
   try {
     const payload = await request.json();
     const token = String(payload.token ?? "").trim();
+    if (payload.intakeType === "training") {
+      if (!/^[a-f0-9]{64}$/.test(token)) return jsonResponse({message:"這個專屬連結無效"},404,cors);
+      const intake = payload.intake;
+      if (!intake || intake.version !== 2 || intake.dataConsent !== true || JSON.stringify(intake).length > 30000) return jsonResponse({message:"請確認必填資料與資料使用說明，並使用最新版問卷。"},422,cors);
+      const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serverKey());
+      const {error} = await supabase.rpc("submit_training_intake", {access_token:token,intake});
+      if (error) {
+        if (error.message.includes("INVALID_TOKEN")) return jsonResponse({message:"這個專屬連結無效"},404,cors);
+        if (error.message.includes("PAYMENT_REQUIRED")) return jsonResponse({message:"付款尚未確認"},403,cors);
+        if(error.message.includes("INVALID_INTAKE")) return jsonResponse({message:"請確認必填欄位、聯絡資料與複選題的選項數量。"},422,cors);
+        return jsonResponse({message:"目前無法儲存課前資料"},500,cors);
+      }
+      return jsonResponse({message:"師資培訓課前資料已儲存完成"},200,cors);
+    }
     const day1SessionId = String(payload.day1SessionId ?? "").trim();
     const day2SessionId = String(payload.day2SessionId ?? "").trim();
     const cohortId = payload.cohortId ? String(payload.cohortId).trim() : null;

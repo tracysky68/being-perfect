@@ -47,3 +47,9 @@ python3 -m http.server 4173
 ```
 
 然後開啟 `http://127.0.0.1:4173/index.html`。
+
+## 兩門課程共用入口
+
+`admin.html` 管理內心畫教師專班與創感力師資培訓，名單及營業額可分開或合併查看。`register.html` 保留內心畫報名流程，`training-payment.html` 提供創感力 PAYUNi 一頁收款入口，`training-intake.html` 為付款後專屬問卷。
+
+UOP 自動建檔由 `payuni-uop-notify` 處理，預設停用。須核對商店 LinkName、啟用資料庫來源映射與設定 PAYUNI_UOP_ENABLED，再完成正式通知驗證。不可僅憑 NT$39,800 金額認定課程或付款成功。

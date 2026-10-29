@@ -27,6 +27,32 @@ async function authenticate(request: Request, supabase: ReturnType<typeof create
 
 async function createManualEnrollment(request: Request, supabase: ReturnType<typeof createClient>, userEmail: string, cors: HeadersInit) {
   const payload = await request.json();
+  if(payload.action === "save_training_payment_link"){
+    let url:URL;
+    try{url=new URL(String(payload.url||""));}catch{return json({message:"請輸入完整的 PAYUNi HTTPS 付款連結。"},422,cors);}
+    if(url.protocol!=="https:"||!(url.hostname==="payuni.com.tw"||url.hostname.endsWith(".payuni.com.tw"))||url.username||url.password||url.port||url.hash||url.href.length>2000||!["payuni_hosted","payuni_credit_installments","cardless_installments"].includes(payload.channel)||typeof payload.active!=="boolean")return json({message:"付款連結或通路不正確。"},422,cors);
+    const {data:setting,error:lookupError}=await supabase.from("training_cohort_settings").select("cohort_id,cohorts!inner(price_twd,courses!inner(code))").eq("cohort_id",payload.cohortId).single();
+    const cohort:any=Array.isArray(setting?.cohorts)?setting.cohorts[0]:setting?.cohorts;
+    if(lookupError||cohort?.courses?.code!=="TEACHER-TRAINING"||Number(payload.amountTwd)!==cohort.price_twd)return json({message:"請確認師資班梯次及付款金額。"},422,cors);
+    const {error}=await supabase.from("training_payment_links").upsert({cohort_id:payload.cohortId,channel:payload.channel,payment_url:url.href,amount_twd:cohort.price_twd,active:payload.active,updated_at:new Date().toISOString()},{onConflict:"cohort_id,channel"});
+    if(error)throw error;
+    await supabase.from("audit_logs").insert({entity_type:"cohort",entity_id:payload.cohortId,action:"training_payment_link_saved",actor:userEmail,details:{channel:payload.channel,active:payload.active}});
+    return json({saved:true},200,cors);
+  }
+  if (payload.action === "set_training_registration") {
+    if (typeof payload.active !== "boolean") return json({message:"報名狀態不正確"},422,cors);
+    const {error} = await supabase.rpc("set_training_registration",{target_cohort:payload.cohortId,accepting:payload.active,actor_email:userEmail});
+    if(error) return json({message:error.message.includes("PAYMENT_SETUP_REQUIRED")?"此梯次的付款通路尚未完成設定與驗證，暫時不能開放報名。":"無法變更報名狀態，請確認梯次與課表設定"},422,cors);
+    return json({updated:true},200,cors);
+  }
+  if (payload.action === "save_training_setup") {
+    const {data,error} = await supabase.rpc("save_training_setup", {settings:payload.settings,actor_email:userEmail});
+    if (error) {
+      const message = error.message.includes("PAYMENT_SETUP_REQUIRED") ? "付款通路尚未完成設定與驗證，請先保留草稿。" : error.message.includes("COHORT_HAS_ENROLLMENTS") ? "此梯次已有報名紀錄，請建立新梯次以保留原課表與費用。" : "請確認梯次名稱、有效費用、可整除的分期期數與課表；開放報名需至少一堂課。";
+      return json({message},422,cors);
+    }
+    return json({cohortId:data},200,cors);
+  }
   if (payload.action === "resend_intake_email") return await resendIntakeEmail(payload, supabase, userEmail, cors);
   if (payload.action === "delete_enrollment") return await deleteEnrollment(payload, supabase, userEmail, cors);
   if (payload.action !== "create_manual_paid") return json({ message: "不支援的操作" }, 400, cors);
@@ -34,6 +60,8 @@ async function createManualEnrollment(request: Request, supabase: ReturnType<typ
   const email = String(payload.email ?? "").trim().toLowerCase();
   const phone = String(payload.phone ?? "").replace(/[\s-]/g, "");
   const cohortId = String(payload.cohortId ?? "");
+  const courseCode = String(payload.courseCode || "TEACHER-DIALOGUE");
+  if (courseCode === "TEACHER-TRAINING" && !cohortId) return json({message:"請選擇師資培訓梯次"},422,cors);
   const amount = Number(payload.amountTwd);
   const paidDate = String(payload.paidDate ?? "");
   const method = String(payload.manualMethod ?? "");
@@ -42,21 +70,24 @@ async function createManualEnrollment(request: Request, supabase: ReturnType<typ
     return json({ message: "請確認所有必填資料" }, 422, cors);
   }
   const { data: cohort } = cohortId
-    ? await supabase.from("cohorts").select("id,title,active").eq("id", cohortId).single()
-    : await supabase.from("cohorts").select("id,title,active").eq("title", "待學員選擇月份").single();
+    ? await supabase.from("cohorts").select("id,title,active,courses!inner(code)").eq("courses.code", courseCode).eq("id", cohortId).single()
+    : await supabase.from("cohorts").select("id,title,active,courses!inner(code)").eq("courses.code", courseCode).eq("title", "待學員選擇月份").single();
   if (!cohort || (cohortId && !cohort.active)) return json({ message: "此梯次目前無法使用" }, 409, cors);
   const { data: existingStudent } = await supabase.from("students").select("id").eq("email", email).maybeSingle();
   if (existingStudent) {
     const { data: duplicate } = await supabase.from("enrollments").select("id").eq("student_id", existingStudent.id).eq("cohort_id", cohort.id).in("status", ["paid", "partially_paid"]).maybeSingle();
     if (duplicate) return json({ message: "這位學員在同一梯次已有已付款紀錄" }, 409, cors);
   }
-  const { data: student, error: studentError } = await supabase.from("students").upsert({ email, full_name: name, phone, updated_at: new Date().toISOString() }, { onConflict: "email" }).select("id").single();
+  const { data: student, error: studentError } = courseCode === "TEACHER-TRAINING" && existingStudent
+    ? {data:existingStudent,error:null}
+    : await supabase.from("students").upsert({ email, full_name: name, phone, updated_at: new Date().toISOString() }, { onConflict: "email" }).select("id").single();
   if (studentError) throw studentError;
   const paidAt = new Date(`${paidDate}T12:00:00+08:00`).toISOString();
   const orderNumber = `MAN${Date.now()}${crypto.randomUUID().slice(0, 4)}`.replaceAll("-", "").toUpperCase();
   const { data: enrollment, error: enrollmentError } = await supabase.from("enrollments").insert({
     order_number: orderNumber, student_id: student.id, cohort_id: cohort.id, status: "paid", amount_twd: amount,
     payment_option: "full", payment_source: "manual", admin_notes: notes || null,
+    contact_snapshot: {name,email,phone},
     privacy_consent_at: paidAt, terms_consent_at: paidAt, paid_at: paidAt,
   }).select("id").single();
   if (enrollmentError) throw enrollmentError;
@@ -72,7 +103,7 @@ async function createManualEnrollment(request: Request, supabase: ReturnType<typ
   const emailRequested = payload.sendEmail === "on";
   if (emailRequested) {
     const intakeUrl = `${(Deno.env.get("PUBLIC_SITE_URL") ?? "https://beingperfect.com.tw").replace(/\/$/, "")}/teacher-intake.html?token=${encodeURIComponent(portal.token)}`;
-    const html = `<!doctype html><html lang="zh-Hant"><body style="margin:0;background:#f8f6ef;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC',sans-serif;color:#171717"><div style="max-width:620px;margin:0 auto;padding:32px 18px"><div style="background:#fff;border:2px solid #171717;border-radius:20px;padding:32px"><p style="color:#eb5656;font-weight:700">玩美學 Being Perfect</p><h1 style="font-size:28px">付款已確認，歡迎加入教師專班</h1><p>${safe(name)} 您好：</p><p style="line-height:1.8">我們已確認您的付款。請點選下方按鈕，完成兩天上課日期與課前背景資料。</p><p><strong>梯次：</strong>${safe(cohort.title)}<br><strong>訂單編號：</strong>${orderNumber}</p><p style="margin:28px 0"><a href="${intakeUrl}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;font-weight:700;padding:15px 24px;border-radius:10px">填寫上課日期與課前資料</a></p><p style="font-size:13px;color:#666">此連結為您的專屬連結，請勿轉傳。</p></div></div></body></html>`;
+    const html = `<!doctype html><html lang="zh-Hant"><body style="margin:0;background:#f8f6ef;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC',sans-serif;color:#171717"><div style="max-width:620px;margin:0 auto;padding:32px 18px"><div style="background:#fff;border:2px solid #171717;border-radius:20px;padding:32px"><p style="color:#eb5656;font-weight:700">玩美學 Being Perfect</p><h1 style="font-size:28px">付款已確認，歡迎加入課程</h1><p>${safe(name)} 您好：</p><p style="line-height:1.8">我們已確認您的付款。請點選下方按鈕，確認課程安排並完成課前背景資料。</p><p><strong>梯次：</strong>${safe(cohort.title)}<br><strong>訂單編號：</strong>${orderNumber}</p><p style="margin:28px 0"><a href="${intakeUrl}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;font-weight:700;padding:15px 24px;border-radius:10px">填寫上課日期與課前資料</a></p><p style="font-size:13px;color:#666">此連結為您的專屬連結，請勿轉傳。</p></div></div></body></html>`;
     const { data: delivery } = await supabase.from("email_deliveries").insert({ enrollment_id: enrollment.id, template: "payment_confirmed_teacher_intake", recipient: email, status: "pending", attempts: 1 }).select("id").single();
     try {
       const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${Deno.env.get("RESEND_API_KEY")}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: Deno.env.get("EMAIL_FROM") ?? "玩美學 <course@mail.beingperfect.com.tw>", to: [email], subject: "付款確認｜請完成上課日期與課前資料", html }) });
@@ -94,11 +125,11 @@ async function deleteEnrollment(payload: any, supabase: ReturnType<typeof create
   if (!/^[0-9a-f-]{36}$/i.test(enrollmentId) || !confirmationName) return json({ message: "刪除確認資料不完整" }, 422, cors);
 
   const { data: enrollment, error } = await supabase.from("enrollments")
-    .select("id,order_number,student_id,students!inner(full_name,email)")
+    .select("id,order_number,student_id,contact_snapshot,students!inner(full_name,email)")
     .eq("id", enrollmentId).single();
   const student = Array.isArray(enrollment?.students) ? enrollment.students[0] : enrollment?.students;
   if (error || !enrollment || !student) return json({ message: "找不到這筆學員資料" }, 404, cors);
-  if (student.full_name !== confirmationName) return json({ message: "確認姓名不一致，已取消刪除" }, 409, cors);
+  if ((enrollment.contact_snapshot?.name ?? student.full_name) !== confirmationName) return json({ message: "確認姓名不一致，已取消刪除" }, 409, cors);
 
   const auditDetails = { orderNumber: enrollment.order_number, studentName: student.full_name, studentEmail: student.email };
   const { error: transactionError } = await supabase.from("payment_transactions").delete().eq("enrollment_id", enrollmentId);
@@ -123,7 +154,7 @@ async function resendIntakeEmail(payload: any, supabase: ReturnType<typeof creat
   const cohort = Array.isArray(enrollment.cohorts) ? enrollment.cohorts[0] : enrollment.cohorts;
   const portal = Array.isArray(enrollment.enrollment_portal_tokens) ? enrollment.enrollment_portal_tokens[0] : enrollment.enrollment_portal_tokens;
   const intakeUrl = `${(Deno.env.get("PUBLIC_SITE_URL") ?? "https://beingperfect.com.tw").replace(/\/$/, "")}/teacher-intake.html?token=${encodeURIComponent(portal.token)}`;
-  const html = `<!doctype html><html lang="zh-Hant"><body style="margin:0;background:#f8f6ef;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC',sans-serif;color:#171717"><div style="max-width:620px;margin:0 auto;padding:32px 18px"><div style="background:#fff;border:2px solid #171717;border-radius:20px;padding:32px"><p style="color:#eb5656;font-weight:700">玩美學 Being Perfect</p><h1 style="font-size:28px">付款已確認，歡迎加入教師專班</h1><p>${safe(student.full_name)} 您好：</p><p style="line-height:1.8">我們已確認您的付款。請點選下方按鈕，選擇上課月份、兩天上課日期，並完成課前背景資料。</p><p><strong>梯次：</strong>${safe(cohort.title)}<br><strong>訂單編號：</strong>${safe(enrollment.order_number)}</p><p style="margin:28px 0"><a href="${intakeUrl}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;font-weight:700;padding:15px 24px;border-radius:10px">填寫上課日期與課前資料</a></p><p style="font-size:13px;color:#666">此連結為您的專屬連結，請勿轉傳。</p></div></div></body></html>`;
+  const html = `<!doctype html><html lang="zh-Hant"><body style="margin:0;background:#f8f6ef;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC',sans-serif;color:#171717"><div style="max-width:620px;margin:0 auto;padding:32px 18px"><div style="background:#fff;border:2px solid #171717;border-radius:20px;padding:32px"><p style="color:#eb5656;font-weight:700">玩美學 Being Perfect</p><h1 style="font-size:28px">付款已確認，歡迎加入課程</h1><p>${safe(student.full_name)} 您好：</p><p style="line-height:1.8">我們已確認您的付款。請點選下方按鈕，確認報名梯次與課程安排，並完成課前背景資料。</p><p><strong>梯次：</strong>${safe(cohort.title)}<br><strong>訂單編號：</strong>${safe(enrollment.order_number)}</p><p style="margin:28px 0"><a href="${intakeUrl}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;font-weight:700;padding:15px 24px;border-radius:10px">填寫上課日期與課前資料</a></p><p style="font-size:13px;color:#666">此連結為您的專屬連結，請勿轉傳。</p></div></div></body></html>`;
   const { data: delivery } = await supabase.from("email_deliveries").upsert({ enrollment_id: enrollment.id, template: "payment_confirmed_teacher_intake", recipient: student.email, status: "pending", attempts: 1, last_error: null, updated_at: new Date().toISOString() }, { onConflict: "enrollment_id,template" }).select("id").single();
   try {
     const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${Deno.env.get("RESEND_API_KEY")}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: Deno.env.get("EMAIL_FROM") ?? "玩美學 <course@mail.beingperfect.com.tw>", to: [student.email], subject: "付款確認｜請選擇上課月份並完成課前資料", html }) });
@@ -149,16 +180,26 @@ Deno.serve(async (request) => {
   try {
     if (request.method === "POST") return await createManualEnrollment(request, supabase, user.email, cors);
     const [{ data: enrollments, error }, { data: cohorts }] = await Promise.all([
-      supabase.from("enrollments").select("id,order_number,status,amount_twd,payment_option,payment_source,admin_notes,paid_at,created_at,students!inner(full_name,email,phone),cohorts!inner(title),pricing_plans(title),payment_transactions(status,provider_trade_number,verified_at),email_deliveries(template,status,attempts,last_error,sent_at),teacher_intake_responses(role_title,organization,teaching_years,student_age_groups,art_background,education_background,main_challenges,focus_questions,learning_expectations,case_description,artwork_permission,additional_notes,submitted_at),enrollment_sessions(module,status,course_sessions(title,starts_at,ends_at,schedule_type))").order("created_at", { ascending: false }).limit(500),
-      supabase.from("cohorts").select("id,title").eq("active", true).order("starts_at"),
+      supabase.from("enrollments").select("id,student_id,cohort_id,contact_snapshot,order_number,status,amount_twd,payment_option,payment_source,admin_notes,paid_at,created_at,students!inner(full_name,email,phone),cohorts!inner(title,courses!inner(code,title)),training_intake_responses(*),pricing_plans(title,total_amount_twd,installment_count),payment_transactions(status,amount_twd,provider_trade_number,verified_at),email_deliveries(template,status,attempts,last_error,sent_at),teacher_intake_responses(role_title,organization,teaching_years,student_age_groups,art_background,education_background,main_challenges,focus_questions,learning_expectations,case_description,artwork_permission,additional_notes,submitted_at),enrollment_sessions(module,status,course_sessions(title,starts_at,ends_at,schedule_type))").order("created_at", { ascending: false }).limit(500),
+      supabase.from("cohorts").select("id,title,courses!inner(code)").eq("active", true).order("starts_at"),
     ]);
     if (error) return json({ message: "無法讀取學員資料" }, 500, cors);
+    const {data: trainingSettings,error: trainingError} = await supabase.from("training_cohort_settings")
+      .select("cohort_id,description,payment_methods,cohorts(title,active),pricing_plans(total_amount_twd,installment_count),training_sessions(id,title,starts_at,ends_at),training_payment_links(channel,payment_url,amount_twd,active)");
+    if (trainingError) throw trainingError;
     const records = (enrollments ?? []).map((row: any) => {
       const intake = Array.isArray(row.teacher_intake_responses) ? row.teacher_intake_responses[0] : row.teacher_intake_responses;
       const delivery = (row.email_deliveries ?? []).find((item: any) => item.template === "payment_confirmed_teacher_intake");
-      return { id: row.id, orderNumber: row.order_number, status: row.status, amountTwd: row.amount_twd, paymentOption: row.payment_option, paymentOptionLabel: row.payment_option === "installments" ? "三期" : "一次付清", paymentSource: row.payment_source, adminNotes: row.admin_notes, paidAt: row.paid_at, createdAt: row.created_at, name: row.students.full_name, email: row.students.email, phone: row.students.phone, cohort: row.cohorts.title, planTitle: row.pricing_plans?.title ?? "", paymentTransactions: row.payment_transactions ?? [], emailStatus: delivery?.status ?? "none", emailStatusLabel: delivery?.status === "sent" ? "已寄送" : delivery?.status === "failed" ? "寄送失敗" : "尚未寄送", emailError: delivery?.last_error ?? null, sessions: (row.enrollment_sessions ?? []).filter((session: any) => ["confirmed", "admin_assigned"].includes(session.status)).map((session: any) => ({ module: session.module, title: session.course_sessions?.title ?? "", startsAt: session.course_sessions?.starts_at, endsAt: session.course_sessions?.ends_at, scheduleType: session.course_sessions?.schedule_type })), intake: intake ? { currentRole: intake.role_title, organization: intake.organization ?? "", teachingYears: intake.teaching_years, studentAgeGroups: intake.student_age_groups ?? [], artBackground: intake.art_background, educationBackground: intake.education_background, mainChallenges: intake.main_challenges ?? [], focusQuestions: intake.focus_questions, learningExpectations: intake.learning_expectations, caseDescription: intake.case_description ?? "", artworkPermission: intake.artwork_permission, additionalNotes: intake.additional_notes ?? "", submittedAt: intake.submitted_at } : null };
+      const transactions = row.payment_transactions ?? [];
+      const paidAmountTwd = transactions.filter((item: any) => item.status === "verified").reduce((sum: number, item: any) => sum + Number(item.amount_twd ?? 0), 0);
+      const expectedAmountTwd = Number(row.pricing_plans?.total_amount_twd ?? row.amount_twd ?? 0);
+      const trainingIntake = Array.isArray(row.training_intake_responses) ? row.training_intake_responses[0] : row.training_intake_responses;
+      const course = row.cohorts.courses;
+      const trainingSetting = (trainingSettings ?? []).find((s:any)=>s.cohort_id===row.cohort_id);
+      return { studentId:row.student_id, cohortId:row.cohort_id, courseCode:course.code, courseTitle:course.title, trainingIntake:trainingIntake ?? null,
+        trainingSessions:trainingSetting?.training_sessions ?? [], id: row.id, orderNumber: row.order_number, status: row.status, amountTwd: row.amount_twd, expectedAmountTwd, paidAmountTwd, paymentOption: row.payment_option, paymentOptionLabel: row.payment_option === "installments" ? `${row.pricing_plans?.installment_count ?? ""} 期` : "一次付清", paymentSource: row.payment_source, adminNotes: row.admin_notes, paidAt: row.paid_at, createdAt: row.created_at, name: row.contact_snapshot?.name ?? row.students.full_name, email: row.contact_snapshot?.email ?? row.students.email, phone: row.contact_snapshot?.phone ?? row.students.phone, cohort: row.cohorts.title, planTitle: row.pricing_plans?.title ?? "", paymentTransactions: transactions, emailStatus: delivery?.status ?? "none", emailStatusLabel: delivery?.status === "sent" ? "已寄送" : delivery?.status === "failed" ? "寄送失敗" : "尚未寄送", emailError: delivery?.last_error ?? null, sessions: (row.enrollment_sessions ?? []).filter((session: any) => ["confirmed", "admin_assigned"].includes(session.status)).map((session: any) => ({ module: session.module, title: session.course_sessions?.title ?? "", startsAt: session.course_sessions?.starts_at, endsAt: session.course_sessions?.ends_at, scheduleType: session.course_sessions?.schedule_type })), intake: intake ? { currentRole: intake.role_title, organization: intake.organization ?? "", teachingYears: intake.teaching_years, studentAgeGroups: intake.student_age_groups ?? [], artBackground: intake.art_background, educationBackground: intake.education_background, mainChallenges: intake.main_challenges ?? [], focusQuestions: intake.focus_questions, learningExpectations: intake.learning_expectations, caseDescription: intake.case_description ?? "", artworkPermission: intake.artwork_permission, additionalNotes: intake.additional_notes ?? "", submittedAt: intake.submitted_at } : null };
     });
-    return json({ records, cohorts: cohorts ?? [] }, 200, cors);
+    return json({ records, cohorts: cohorts ?? [], trainingSettings: trainingSettings ?? [] }, 200, cors);
   } catch (error) {
     console.error("admin-dashboard", error);
     return json({ message: "操作失敗，請稍後再試" }, 500, cors);

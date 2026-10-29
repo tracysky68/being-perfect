@@ -1,4 +1,5 @@
 window.BP_CONFIG = {
+  trainingPaymentLinksEndpoint: "https://arsqrdesdvfpgsiduvzs.supabase.co/functions/v1/training-payment-links",
   paymentEndpoint: "https://arsqrdesdvfpgsiduvzs.supabase.co/functions/v1/create-payment",
   cohortsEndpoint: "https://arsqrdesdvfpgsiduvzs.supabase.co/functions/v1/list-cohorts",
   intakeEndpoint: "https://arsqrdesdvfpgsiduvzs.supabase.co/functions/v1/get-teacher-intake",

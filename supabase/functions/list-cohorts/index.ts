@@ -20,7 +20,7 @@ Deno.serve(async (request) => {
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, supabaseServerKey());
   const { data: course, error: courseError } = await supabase.from("courses")
-    .select("id").eq("code", courseCode).eq("active", true).single();
+    .select("id,title,description").eq("code", courseCode).eq("active", true).single();
   if (courseError || !course) {
     console.error("course lookup", courseError);
     return jsonResponse({ message: "Course is unavailable" }, 404, cors);
@@ -35,7 +35,14 @@ Deno.serve(async (request) => {
     .select("code,title,total_amount_twd,installment_count,installment_amount_twd,eligibility")
     .eq("active", true).eq("course_id", course.id).order("total_amount_twd", { ascending: false });
   if (plansError) return jsonResponse({ message: "Unable to load pricing" }, 500, cors);
+  const training = courseCode === "TEACHER-TRAINING";
+  const { data: settings, error: settingsError } = training
+    ? await supabase.from("training_cohort_settings").select("cohort_id,description,payment_methods,pricing_plans(code),training_sessions(id,title,starts_at,ends_at)").in("cohort_id", (data ?? []).map(c => c.id))
+    : { data: [], error: null };
+  if (settingsError) return jsonResponse({ message: "Unable to load training schedule" }, 500, cors);
   return jsonResponse({
+    course: { title: course.title, description: course.description },
+    trainingSettings: settings ?? [],
     cohorts: (data ?? []).map((item) => ({ id: item.id, title: item.title, startsAt: item.starts_at })),
     pricingPlans: (plans ?? []).map((plan) => ({
       code: plan.code, title: plan.title, totalAmountTwd: plan.total_amount_twd,
