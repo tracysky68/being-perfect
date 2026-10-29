@@ -1,3 +1,4 @@
+import {subscriptionToken,digest as calendarDigest} from '../_shared/course-calendar-feed.ts';
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 const env=(k:string)=>Deno.env.get(k)||'';
 const site=()=>env('PUBLIC_SITE_URL')||'https://beingperfect.com.tw';
@@ -65,6 +66,27 @@ async function publicAction(p:any){
  if(sessionError||!session||new Date(session.expires_at).getTime()<=Date.now())fail('連結已過期，請回官方 LINE 點「我的課程」',401);
  const {data:binding}=await client.from('course_line_bindings').select('student_id,verified_email,students(email,full_name)').eq('line_user_id',session.line_user_id).maybeSingle();
  if(!binding||binding.students?.email!==binding.verified_email)fail('請回官方 LINE 重新驗證報名 Email',401);
+ if(['calendar_status','calendar_create','calendar_revoke'].includes(p.action)){
+  if(p.action==='calendar_revoke'){
+   if(p.confirmed!==true)fail('請確認停用訂閱');
+   const {error}=await client.from('course_calendar_subscriptions').delete().eq('student_id',binding.student_id);
+   if(error)fail('停用訂閱失敗，請稍後再試',503);
+   return {active:false};
+  }
+  let {data:subscription,error}=await client.from('course_calendar_subscriptions').select('seed,token_hash').eq('student_id',binding.student_id).maybeSingle();
+  if(error)fail('讀取訂閱失敗',503);
+  if(!subscription&&p.action==='calendar_create'){
+   const seed=random();const token=await subscriptionToken(seed,env('COURSE_BINDING_SECRET'));
+   const inserted=await client.from('course_calendar_subscriptions').insert({student_id:binding.student_id,seed,token_hash:await calendarDigest(token)});
+   if(inserted.error&&inserted.error.code!=='23505')fail('建立訂閱失敗',503);
+   const result=await client.from('course_calendar_subscriptions').select('seed,token_hash').eq('student_id',binding.student_id).single();
+   if(result.error)fail('建立訂閱失敗',503);subscription=result.data;
+  }
+  if(!subscription)return {active:false};
+  const calendarToken=await subscriptionToken(subscription.seed,env('COURSE_BINDING_SECRET'));
+  if(await calendarDigest(calendarToken)!==subscription.token_hash)fail('訂閱設定已更新，請停用後重新建立',409);
+  return {active:true,url:env('SUPABASE_URL')+'/functions/v1/course-calendar-feed?token='+calendarToken};
+ }
  if(p.action==='unlink'){
   if(p.confirmed!==true)fail('請確認解除綁定');await rpc(client,'course_unlink',{line_uid:session.line_user_id});return {message:'已解除綁定，報名與付款紀錄仍會保留。'};
  }

@@ -33,3 +33,6 @@ verify_jwt = false
 
 [functions.course-account-link]
 verify_jwt = false
+
+[functions.course-calendar-feed]
+verify_jwt = false
