@@ -1,3 +1,4 @@
+import { reminderAdmin } from "../_shared/course-reminders.ts";
 import { handleLineIntake } from "../_shared/line-intake.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -28,6 +29,10 @@ async function authenticate(request: Request, supabase: ReturnType<typeof create
 
 async function createManualEnrollment(request: Request, supabase: ReturnType<typeof createClient>, userEmail: string, cors: HeadersInit) {
   const payload = await request.json();
+  if (["reminder_settings","save_reminder_settings","reminder_status"].includes(payload.action)) {
+    try{return json(await reminderAdmin(payload,supabase,userEmail),200,{...cors,"Cache-Control":"no-store"});}
+    catch(error){return json({message:payload.action==='save_reminder_settings'&&error.message?.startsWith('請')?error.message:'無法讀取或儲存提醒設定，請稍後重試'},422,cors);}
+  }
   if(payload.action === "save_training_payment_link"){
     let url:URL;
     try{url=new URL(String(payload.url||""));}catch{return json({message:"請輸入完整的 PAYUNi HTTPS 付款連結。"},422,cors);}

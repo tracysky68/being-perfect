@@ -1,0 +1,42 @@
+-- Run in isolated PostgreSQL with test_now() replacing now() in reminder migration.
+begin;
+do $$
+declare pid uuid; sid uuid; cid uuid; eid uuid; course_id_value uuid; n integer;
+begin
+ select id into course_id_value from courses where code='TEACHER-TRAINING';
+ insert into students(email,full_name,phone) values('reminder@example.invalid','提醒測試','') returning id into sid;
+ insert into course_line_bindings(student_id,line_user_id,verified_email) values(sid,'U11111111111111111111111111111111','reminder@example.invalid');
+ insert into cohorts(course_id,title,price_twd) values(course_id_value,'提醒隔離測試',39800) returning id into cid;
+ insert into pricing_plans(course_id,code,title,total_amount_twd,installment_amount_twd) values(course_id_value,'TEST-REMINDER','Test',39800,39800) returning id into pid;
+ insert into training_cohort_settings(cohort_id,pricing_plan_id) values(cid,pid);
+ insert into training_sessions(cohort_id,title,starts_at,ends_at) values(cid,'Day1','2026-11-02T10:00:00+08:00','2026-11-02T17:00:00+08:00'),(cid,'Day2','2026-11-03T10:00:00+08:00','2026-11-03T17:00:00+08:00');
+ insert into enrollments(student_id,cohort_id,order_number,status,amount_twd,privacy_consent_at,terms_consent_at) values(sid,cid,'TEST-REMINDER','paid',39800,now(),now()) returning id into eid;
+ if (select first_start from course_reminder_candidates where enrollment_id=eid)<>'2026-11-02T02:00Z' then raise exception 'Wrong first date';end if;
+ select count(*) into n from claim_course_reminders();if n<>0 then raise exception 'Draft sent';end if;
+ insert into course_reminder_settings(cohort_id,enabled,location_text,actor) values(cid,true,'測試地點','test');
+ update test_clock set t='2026-10-30T01:59:59Z';
+ select count(*) into n from claim_course_reminders();if n<>0 then raise exception 'Sent before 10';end if;
+ update test_clock set t='2026-10-30T02:00Z';
+ update enrollments set status='pending_payment' where id=eid;
+ select count(*) into n from claim_course_reminders();if n<>0 then raise exception 'Unpaid sent';end if;
+ update enrollments set status='paid' where id=eid;
+ update course_line_bindings set verified_email='other@example.invalid' where student_id=sid;
+ select count(*) into n from claim_course_reminders();if n<>0 then raise exception 'Stale binding sent';end if;
+ update course_line_bindings set verified_email='reminder@example.invalid' where student_id=sid;
+ select count(*) into n from claim_course_reminders();if n<>1 then raise exception 'Expected one 3-day reminder, got %',n;end if;
+ select count(*) into n from claim_course_reminders();if n<>0 then raise exception 'Duplicate claim';end if;
+ update test_clock set t='2026-10-30T02:11Z';
+ perform claim_course_reminders();
+ if (select status from course_reminder_deliveries where enrollment_id=eid)<>'unknown' then raise exception 'Interrupted send not retained';end if;
+ update test_clock set t='2026-11-01T02:00Z';
+ select count(*) into n from claim_course_reminders();if n<>1 then raise exception 'Missing 1-day reminder';end if;
+ update training_sessions set starts_at=starts_at+interval '3 days',ends_at=ends_at+interval '3 days' where cohort_id=cid;
+ select count(*) into n from claim_course_reminders();if n<>0 then raise exception 'Old schedule used';end if;
+ update test_clock set t='2026-11-02T02:00Z';
+ select count(*) into n from claim_course_reminders();if n<>1 then raise exception 'Updated schedule missing';end if;
+ update enrollments set status='cancelled' where id=eid;
+ update test_clock set t='2026-11-04T02:00Z';
+ select count(*) into n from claim_course_reminders();if n<>0 then raise exception 'Cancelled sent';end if;
+ if has_table_privilege('anon','course_reminder_deliveries','SELECT') or has_function_privilege('authenticated','claim_course_reminders()','EXECUTE') then raise exception 'Public permissions';end if;
+end $$;
+rollback;

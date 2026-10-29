@@ -1,3 +1,4 @@
+import { setupReminders } from "./admin-reminders.js?v=20261030";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const config = window.BP_CONFIG;
@@ -185,8 +186,11 @@ function openDetail(id) {
   }
   document.querySelector("#student-detail").insertAdjacentHTML("beforeend", `<section class="detail-danger-zone"><div><h3>刪除學員資料</h3><p>永久刪除此筆報名、付款、選課與課前資料。此操作無法復原。</p></div><button type="button" data-delete-student>刪除學員</button><p data-delete-status class="form-status" role="status"></p></section>`);
   document.querySelector("[data-delete-student]").addEventListener("click", () => deleteStudent(r));
+  reminderUI.detail(r,document.querySelector("#student-detail"));
   dialog.showModal();
 }
+
+const reminderUI=setupReminders({supabase,config,dashboard:dashboardView,escapeHtml,dateTime});
 
 async function deleteStudent(record) {
   if (!window.confirm(`確定要永久刪除「${record.name}」的這筆報名資料嗎？\n\n刪除後無法復原。`)) return;
