@@ -150,6 +150,33 @@ function openDetail(id) {
         root.querySelector('[data-line-message]').value=result.message;root.querySelector('[data-line-result]').hidden=false;status.textContent='訊息已備妥，尚未發送。';
       }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
     });
+    root.insertAdjacentHTML('beforeend',`<div class="line-direct-panel"><h4>從後台手動發送</h4><p>先在官方 LINE 核對學員本人，複製該學員的聊天室網址貼到下方。LINE 暱稱可能與報名姓名不同，請勿只憑姓名選人。</p><label>學員的官方 LINE 聊天室網址<input data-line-recipient type="text" style="width:100%;box-sizing:border-box" placeholder="https://chat.line.biz/…/chat/…" autocomplete="off"></label><button type="button" data-line-preview>核對收件人與訊息</button><p data-line-direct-status role="status">正在讀取發送紀錄…</p><div data-line-confirm hidden><p data-line-recipient-name></p><textarea data-line-send-message readonly rows="10" style="width:100%;box-sizing:border-box;font:inherit"></textarea><label><input data-line-confirm-check type="checkbox">我已核對此 LINE 聯絡人就是這位學員本人</label><button type="button" data-line-send disabled>確認透過官方 LINE 發送</button></div></div>`);
+    const directStatus=root.querySelector('[data-line-direct-status]'),previewButton=root.querySelector('[data-line-preview]'),sendButton=root.querySelector('[data-line-send]'),confirmBox=root.querySelector('[data-line-confirm]'),confirmCheck=root.querySelector('[data-line-confirm-check]');
+    let preview=null;
+    const callLine=async(action,extra={})=>{
+      const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error('請重新登入');
+      const response=await fetch(config.adminEndpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({action,enrollmentId:r.id,...extra})});
+      const result=await response.json();if(!response.ok)throw new Error(result.message||'LINE 操作失敗');return result;
+    };
+    const showDelivery=result=>{
+      const d=result.delivery;const labels={sending:'發送處理中，請勿重送',accepted:'LINE 已受理（不代表已讀）',failed:'發送失敗，請管理員核對',unknown:'結果待確認，請勿重送',external_scheduled:'已在官方 LINE 預約發送'};
+      directStatus.textContent=d?`${labels[d.status]||d.status}。${d.note||''}`:result.message||'尚未發送。';
+      if(d||result.blocked){previewButton.disabled=true;sendButton.disabled=true;confirmBox.hidden=true;}
+    };
+    previewButton.disabled=true;
+    callLine('line_intake_status').then(result=>{showDelivery(result);previewButton.disabled=Boolean(result.delivery)||!result.configured;if(!result.configured)directStatus.textContent='官方 LINE 尚未完成串接設定，仍可使用上方複製功能。';}).catch(error=>{directStatus.textContent=error.message;});
+    root.querySelector('[data-line-recipient]').addEventListener('input',()=>{preview=null;confirmCheck.checked=false;sendButton.disabled=true;confirmBox.hidden=true;});
+    confirmCheck.addEventListener('change',()=>{sendButton.disabled=!preview||!confirmCheck.checked;});
+    previewButton.addEventListener('click',async()=>{
+      previewButton.disabled=true;preview=null;confirmBox.hidden=true;confirmCheck.checked=false;sendButton.disabled=true;directStatus.textContent='正在核對官方 LINE 聯絡人…';
+      try{const result=await callLine('preview_line_intake',{recipient:root.querySelector('[data-line-recipient]').value});if(result.blocked){showDelivery(result);return;}preview=result;root.querySelector('[data-line-recipient-name]').textContent=`發送帳號：${result.officialName}｜LINE 收件人：${result.displayName}｜報名學員：${result.name}`;root.querySelector('[data-line-send-message]').value=result.message;confirmBox.hidden=false;directStatus.textContent='請核對收件人與內容，勾選後才能發送。';}
+      catch(error){directStatus.textContent=error.message;}finally{if(preview)previewButton.disabled=false;else if(!directStatus.textContent.includes('已有'))previewButton.disabled=false;}
+    });
+    sendButton.addEventListener('click',async()=>{
+      if(!preview||!confirmCheck.checked)return;sendButton.disabled=true;previewButton.disabled=true;root.querySelector('[data-line-recipient]').disabled=true;confirmCheck.disabled=true;directStatus.textContent='正在提交至官方 LINE，請勿重複操作…';
+      try{const result=await callLine('send_line_intake',{recipient:preview.userId,messageHash:preview.hash,displayName:preview.displayName,confirmed:true});showDelivery(result);}
+      catch(error){directStatus.textContent=error.message+'；請重新開啟此學員查看發送紀錄，勿立即重送。';}
+    });
     root.querySelector('[data-copy-line]').addEventListener('click',async()=>{
       const field=root.querySelector('[data-line-message]'),status=root.querySelector('[data-line-status]');
       try{await navigator.clipboard.writeText(field.value);status.textContent='已複製，請貼到官方 LINE 傳給本人；尚未代為發送。';}

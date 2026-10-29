@@ -1,3 +1,4 @@
+import { handleLineIntake } from "../_shared/line-intake.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") ?? "";
@@ -52,6 +53,10 @@ async function createManualEnrollment(request: Request, supabase: ReturnType<typ
       return json({message},422,cors);
     }
     return json({cohortId:data},200,cors);
+  }
+  if (["line_intake_status","preview_line_intake","send_line_intake"].includes(payload.action)) {
+    try { return json(await handleLineIntake(payload,supabase,userEmail),200,{...cors,"Cache-Control":"no-store"}); }
+    catch(error) { return json({message:error.status ? error.message : "LINE 服務暫時無法使用，請稍後再試"},error.status||503,cors); }
   }
   if (payload.action === "prepare_line_intake") {
     const { data: e, error } = await supabase.from("enrollments")
